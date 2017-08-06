@@ -349,7 +349,8 @@ Sidebar {.sidebar}
 
 <ppp>Hi everyone,</br> We are **Life is struggle.**</ppp>
 
-<h2 style="color:#ef6034;">__Topic__</h2> 
+<h2 style="color:#ef6034;">__U-Optimizer__</h2> 
+
 
 <ppp>透明治理</ppp>
 
@@ -370,8 +371,8 @@ Sidebar {.sidebar}
 1. [林芃彣（Nicole）-<br>政大統計所]()
 2. [楊佩雯（Penny）-<br>政大統計所]()
 3. [黃培軒（Bacon）-<br>政大統計所]()
-4. [劉家豪 ()-<br>台大國企所,政大統計所]()
-5. [林立哲 ()]()
+4. [劉家豪 (Jia-Hau Liu)-<br>台大國企所,政大統計所]()
+5. [林立哲 (Li-Jer, Lin)-<br>信義房屋]()
 
 
 </pp>
