@@ -36,7 +36,7 @@ Data{#data-describe}
 - [Population Data](http://data.moi.gov.tw/MoiOD/Data/DataDetail.aspx?oid=F4478CE5-7A72-4B14-B91A-F4701758328F)
 - [Household Data](http://data.moi.gov.tw/MoiOD/Data/DataDetail.aspx?oid=F4478CE5-7A72-4B14-B91A-F4701758328F)
 - [Ranks of Total Retail Sales](https://moeagis.carto.com/viz/b5e9f4e8-dc7c-11e6-8815-0ef24382571b/public_map)
-- [營業商家登記](http://ronnywang-twcompany.s3-website-ap-northeast-1.amazonaws.com/index.html)
+- [Registered Business Sectors](http://ronnywang-twcompany.s3-website-ap-northeast-1.amazonaws.com/index.html)
 - [Housing Login Prices]()
 - [Park Data](https://sheethub.com/data.taipei.gov.tw/%E8%87%BA%E5%8C%97%E5%B8%82%E9%84%B0%E9%87%8C%E5%85%AC%E5%9C%92%E9%BB%9E%E4%BD%8D%E8%B3%87%E6%96%99)
 
