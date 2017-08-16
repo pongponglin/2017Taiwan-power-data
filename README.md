@@ -4,7 +4,7 @@
 ### Processed data
 - final6_class.csv : 統整後變數檔
 - radar_plot.csv : 繪製雷達圖檔
-- Data_class_outlier.csv : 分群與離群值判斷檔
+- Data_class_outlier.csv : 分群與離群值判斷後
 
 ### Source code
 - 資料預處理.R : 變數選取與資料整理
@@ -12,11 +12,11 @@
 - 離群值判斷.R
 
 ### Presentation
-- Final_Hackathon.pptx：2017 ASIA open data Hackthon
+- Final_Hackathon.pptx：2017 ASIA open data Hackthon_Life is struggle
 
 ### Product
 - 跨國黑客松.Rmd
 - 跨國黑客松.html
 
 ### LICENSE
-- LICENSE.txt：2017 ASIA open data Hackthon
+- LICENSE.txt：2017 ASIA open data Hackthon_Life is struggle
