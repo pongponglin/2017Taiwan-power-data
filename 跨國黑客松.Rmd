@@ -16,93 +16,500 @@ library(dplyr)
 library(ggplot2)
 library(plotly)
 library(highcharter)
-# 讀入原始資料
-#final <- fread("/Users/yangpeiwen/Documents/政大/台電比賽/final4.csv")
-# 分群完的資料
+library(DT)
+# 讀入分群完的原始資料
+tp_cluster <- fread("processed_data/taipei456_cluster.csv")
+tp_cluster %>% dplyr::select(1,"戶均用電", "分群") -> power
 # 雷達圖資料
+cluster_rader<-read.csv("processed_data/radar_plot.csv",fileEncoding = 'utf8')
+# 四國資料 
+asia <- fread("processed_data/Asia.csv")
 ```
 
 
-Data{#data-describe}
+Motivation {#motivation1 data-navmenu="Motivation"}
+=====================================   
+
+<h1 style="color:#b10026;text-align:center;">Electricity Shortage is knocking our doors</h1>
+<pppp>In Taiwan, insufficient electricity supply is always an important issue. Especially in summer, we are usually under the risk of power outage. Sometimes, it really happened[(8/17 Power Outage in Taiwan)](https://udn.com/news/story/11419/2644282)In both Trends of Demand and Stability imply electricity shortage will be an even serious problem.</pppp>
+</br>
+
+<h1 style="color:#b10026;text-align:center;"> Electricity demand is ascending </h1>
+<pppp>In the past 4 years, the demand of electricity in Taiwan has increased about 8%. Furthermore, our government intends to shut down all the nuclear power plants by 2025. In fact, nuclear power plants account for 14% of total electricity supply. </pppp>
+</br>
+
+<h1 style="color:#b10026;text-align:center;"> Electricity supply becomes unstable </h1>
+<pppp>Operating reserve rate keeps decreasing and it hasn’t achieved the goal set by Taipower corp. 4 years in a row. Low operating reserve rate implies any unexpected power plant shut down Taiwan will suffer from power outage. </pppp>
+</br>
+
+<h1 style="color:#b10026;text-align:center;">Current policies are paved with good intentions but inefficient</h1>
+<pppp>	Although the government enforce a bunch of different policies to solve this problem, it isn’t effective at all. For example [Save the electricity on your own](http://energy-smartcity.energypark.org.tw/), [Countrywide Electricity saving completion.](http://energy-2016summer.energypark.org.tw/) However, governors didn’t clarify the reasons of wasting electricity for different regions. Without comprehending the actual reasons of wasting electricity, how can they come up with an appropriate policy to curb the electricity waste. </pppp>
+</br>
+
+<h1 style="color:#b10026;text-align:center;">Our goal</h1>
+<pppp>	The Electricity saving policies enforcing process can be broken down into 3 parts, Identify the regions wasting electricity, figure out the reasons they wasting, and Set up corresponding policies. Our product was designed to shorten the time consumed during this process and help governors apply the right policies on the right regions. </pppp>
+</br>
+
+<h1 style="color:#b10026;text-align:center;">How we achieve our goal？ U-Optimizer</h1>
+<pppp>	To customize the policies by region is the key of achieving our goal. We utilized a lot of open data, Including demographics data, economic data, electricity usage data ….etc. Besides, we use both supervised and unsupervised machine learning methodologies to cluster the villages around Taiwan. In the end, we want to deliver a system which can assist governors to arrange the current policies to appropriate villages or set up a whole new policy for specific villages. </pppp>
+
+
+4 countries' MAP{#motivation2 data-navmenu="Motivation"}
+=====================================   
+
+Column {data-width=500}
+-------------------------------------
+    
+### Taiwan
+<iframe width="90%" height="480" frameborder="0" src="https://ssweetcoww.carto.com/viz/963a79f1-2ccf-4539-a4a5-114f21b6c72a/embed_map" allowfullscreen webkitallowfullscreen mozallowfullscreen oallowfullscreen msallowfullscreen></iframe>
+Taiwan
+
+### Japan
+<iframe width="90%" height="480" frameborder="0" src="https://ssweetcoww.carto.com/viz/44328ecc-01f6-413a-85c4-79885a50fe64/embed_map" allowfullscreen webkitallowfullscreen mozallowfullscreen oallowfullscreen msallowfullscreen></iframe>
+Japan
+
+Column {data-width=500}
+-------------------------------------
+
+### Korea
+<iframe width="90%" height="480" frameborder="0" src="https://ssweetcoww.carto.com/viz/0dda36f9-1689-4eb1-9302-526e7c834992/embed_map" allowfullscreen webkitallowfullscreen mozallowfullscreen oallowfullscreen msallowfullscreen></iframe>
+Korea
+
+### Thailand
+<iframe width="90%" height="480" frameborder="0" src="https://ssweetcoww.carto.com/viz/75b22836-b7fb-40e8-bb95-0fbaf99d2618/embed_map" allowfullscreen webkitallowfullscreen mozallowfullscreen oallowfullscreen msallowfullscreen></iframe>
+Thailand
+
+
+4 countries' Data  {#motivation3 data-navmenu="Motivation"}
+=====================================   
+```{r}
+asia %>% dplyr::select(2,3,8,5,12,6,13,7,9,11) %>% 
+  DT::datatable(
+    options = list(pageLength = 30)) 
+
+```
+
+
+Data {#data-describe data-navmenu="Analysis"}
 =====================================   
 
 </br>
 
-<pp> Taiwan Open data </pp>
+<h1 style="color:#b10026;"> Taiwan Open data </h1>
 
-- [Taiwan Power Company Open Data](http://www.taipower.com.tw/content/announcement/ann01.aspx?BType=31)
-- [Taiwan Educational Level](http://data.gov.tw/node/8409)
-- [Income Tax Data](http://data.gov.tw/node/17983)
-- [Population Data](http://data.moi.gov.tw/MoiOD/Data/DataDetail.aspx?oid=F4478CE5-7A72-4B14-B91A-F4701758328F)
-- [Household Data](http://data.moi.gov.tw/MoiOD/Data/DataDetail.aspx?oid=F4478CE5-7A72-4B14-B91A-F4701758328F)
-- [Ranks of Total Retail Sales](https://moeagis.carto.com/viz/b5e9f4e8-dc7c-11e6-8815-0ef24382571b/public_map)
-- [Registered Business Sectors](http://ronnywang-twcompany.s3-website-ap-northeast-1.amazonaws.com/index.html)
-- [Housing Login Prices]()
-- [Park Data](https://sheethub.com/data.taipei.gov.tw/%E8%87%BA%E5%8C%97%E5%B8%82%E9%84%B0%E9%87%8C%E5%85%AC%E5%9C%92%E9%BB%9E%E4%BD%8D%E8%B3%87%E6%96%99)
+- <ppp>[Taiwan Power Company Open Data](http://www.taipower.com.tw/content/announcement/ann01.aspx?BType=31)</ppp></br>
+- <ppp>[Taiwan Educational Level](http://data.gov.tw/node/8409)</ppp></br>
+- <ppp>[Income Tax Data](http://data.gov.tw/node/17983)</ppp></br>
+- <ppp>[Population Data](http://data.moi.gov.tw/MoiOD/Data/DataDetail.aspx?oid=F4478CE5-7A72-4B14-B91A-F4701758328F)</ppp></br>
+- <ppp>[Household Data](http://data.moi.gov.tw/MoiOD/Data/DataDetail.aspx?oid=F4478CE5-7A72-4B14-B91A-F4701758328F)</ppp></br>
+- <ppp>[Ranks of Total Retail Sales](https://moeagis.carto.com/viz/b5e9f4e8-dc7c-11e6-8815-0ef24382571b/public_map)</ppp></br>
+- <ppp>[Registered Business Sectors](http://ronnywang-twcompany.s3-website-ap-northeast-1.amazonaws.com/index.html)</ppp></br>
+- <ppp>[Housing Login Prices](http://plvr.land.moi.gov.tw/DownloadOpenData)</ppp></br>
+- <ppp>[Park Data](https://sheethub.com/data.taipei.gov.tw/%E8%87%BA%E5%8C%97%E5%B8%82%E9%84%B0%E9%87%8C%E5%85%AC%E5%9C%92%E9%BB%9E%E4%BD%8D%E8%B3%87%E6%96%99)</ppp></br>
 
 ---------------
 
-<pp> Data Description </pp>
+</br>
 
-- 使用2016年7月、8月的非營業電力資料分析
-- 使用2016年教育程度的資料，合理推估2016年7月、8月的教育程度狀況
-- 所得稅資料之涵蓋範圍為2013年，假設2013年與2016年之人口結構相似進行推估
-- 人口統計資料之最新資料為2015年，合理假設2015年與2016年之人口結構相似，因此使用2015年推估2016年
-- 使用2016第三季之住宅統計資料
-- 使用2016零售業銷售金額之村里排名
-- 累積至2017年7月之營業商家登記數
-- 使用2014年-2016年之實價登錄資料
-- 累積至2015年7月之公園數量與坪數
+<h1 style="color:#b10026;"> Detail Description </h1>
 
+- <ppp>使用2016年7月、8月的非營業電力資料分析</ppp></br>
+- <ppp>使用2016年教育程度的資料，合理推估2016年7月、8月的教育程度狀況</ppp></br>
+- <ppp>所得稅資料之涵蓋範圍為2013年，假設2013年與2016年之人口結構相似進行推估</ppp></br>
+- <ppp>人口統計資料之最新資料為2015年，合理假設2015年與2016年之人口結構相似，因此使用2015年推估2016年</ppp></br>
+- <ppp>使用2016第三季之住宅統計資料</ppp></br>
+- <ppp>使用2016零售業銷售金額之村里排名</ppp></br>
+- <ppp>累積至2017年7月之營業商家登記數</ppp></br>
+- <ppp>使用2014年-2016年之實價登錄資料</ppp></br>
+- <ppp>累積至2015年7月之公園數量與坪數</ppp></br>
 
-ClusterMap{#clustermap}
+Analysis Process {#analysis2 data-navmenu="Analysis"}
 =====================================   
 
+<h1 style="color:#b10026;"> Analysis Process </h1>
 
-Column {data-width=650}
------------------------------------------------------------------------
+<pppp> 1. Cleane nine data set separately.</pppp></br>
+<pppp> 2. Merge data that cleaned together with 111 variables</pppp></br>
+<pppp> 3. Use "Greedy Search" and "K-means" to filter out useful variables</pppp></br>
+<pppp> 4. </pppp></br>
+<pppp> 5. </pppp></br>
 
-### <pp>Map</pp>
-<iframe width="100%" height="520" frameborder="0" src="https://ssweetcoww.carto.com/viz/996e544f-759b-439f-bdb0-37fd7b5c0e3c/embed_map" allowfullscreen webkitallowfullscreen mozallowfullscreen oallowfullscreen msallowfullscreen></iframe>
+<br/>
+
+<div align="center"> <img src="plot/Data.png" width=1600 height=600></div>
+
+<br/>
+
+Merged Data {#analysis1 data-navmenu="Analysis"}
+=====================================   
+
+### Merged Data 
 
 ```{r}
+tp_cluster %>%  
+  select(行政區域,人口數,戶均用電,青少年人口,壯年人口,老年人口,綜合所得總額,中位數,房價中位數,商家數,公園數,公園坪數,每戶平均人數,博士比例,碩士比例,大學比例,大學以下比例,平均屋齡,零售排名, 每戶平均老年人口數.人.,有偶比例...) -> origin
+colnames(origin) = c("Region", "Population", "Electricity/household", "teenager", "Prime age", "elderly", "Total income", "Med_Income","Med_housing_price", "Business Sectors", "park", "Park pings", "population/household", "Ph.D.%","Master%", "College%", "Under college%", "House age", "retail rank", "Older_population/household", "Marriage_rate")
+
+origin %>% 
+  DT::datatable(
+    options = list(pageLength = 30)) %>% formatRound(c(2,13:18,20,21),digits = 2)
+```
+
+
+Radar Data {#analysis3 data-navmenu="Analysis"}
+=====================================   
+
+Column {data-width=620}
+-------------------------------------
+
+### Radar Data
+
+```{r}
+tp_cluster %>%  mutate(用電 = log(戶均用電),
+                   扶養比 = (青少年人口+老年人口)/壯年人口,
+                   所得中位log = log10(中位數),
+                   老年比例 = 每戶平均老年人口數.人./每戶平均人數,
+                   單身率  = 1 - 有偶比例...) %>% 
+  select(行政區域, 分群, X1人一宅宅數比例... ,X6人以上一宅宅數比例..., 房價中位數,大學以下比例, 扶養比,老年比例 ,單身率, 戶均用電) -> radar_data
+names(radar_data) = c("Region","Cluster", "1_live_rate", "6_live_rate", "Med_housing_price", "Under_college%", "Dependency_ratio","Eldery_one", "Single_rate", "Electricity")
+radar_data[radar_data$Cluster == "第一群", "Cluster"] <- "Cluster1"
+radar_data[radar_data$Cluster == "第二群", "Cluster"] <- "Cluster2"
+radar_data[radar_data$Cluster == "第三群", "Cluster"] <- "Cluster3"
+radar_data[radar_data$Cluster == "第四群", "Cluster"] <- "Cluster4"
+radar_data[radar_data$Cluster == "第五群", "Cluster"] <- "Cluster5"
+radar_data %>%
+  DT::datatable(
+    options = list(pageLength = 30)) %>% formatRound(3:9,digits = 3)
 
 ```
 
-Column {data-width=350}
------------------------------------------------------------------------
+Column {data-width=380}
+-------------------------------------
 
-### <pp>Cluster1</pp>
-<pp> **Single Office Worker** </pp>
+### Index Variables 
 
-### <pp>Cluster2 </pp>
-<pp> **General Family** </pp>
+<pp style="color:#b10026;">  1. 1_live_rate</pp>
 
-### <pp>Cluster3 </pp>
-<pp> **DINKY** </pp>
+<ppp>一人一宅戶數比例</ppp>
 
-### <pp>Cluster4 </pp>
-<pp> **Winner at the Game of Life** </pp>
+<pp style="color:#b10026;">  2. 6_live_rate</pp>
 
-### <pp>Cluster5 </pp>
-<pp> **Multi-child Family** </pp>
+<ppp>六人一宅戶數比例</ppp>
+
+<pp style="color:#b10026;">  3. Med_housing_price</pp>
+
+<ppp>房價中位數:該里的實價登錄交易坪價中位數</ppp>
+
+<pp style="color:#b10026;">  4. Under_college% </pp>
+
+<ppp>大學以下比例</ppp>
+
+<pp style="color:#b10026;"> 5. Dependency_ratio</pp>
+
+<ppp>扶養比：（少年人口+老年人口）/壯年人口</ppp>
+
+- <ppp>少年人口：0~14歲的人口</ppp></br>
+- <ppp>壯年人口：15~64歲的人口</ppp></br>
+- <ppp>老年人口：65以上的人口</ppp>
+
+<pp style="color:#b10026;">  6. Eldery_one</pp>
+
+<ppp>每戶老人人數比例：每戶平均老人人數/每戶平均人數</ppp>
+
+<pp style="color:#b10026;">  7. Single_rate</pp>
+
+<ppp>單身比例：1-有偶比</ppp>
+
+<pp style="color:#b10026;">  8. Electricity</pp>
+
+<ppp>用電量：取log</ppp>
 
 Cluster{#cluster}
 =====================================   
 
-
 Column {.tabset .tabset-fade}
 -------------------------------------
 
+### Multi Resident Housing
+```{r}
+## color
+#col.raw <- c("#1d3156","#ff9c63","#7dbfc6","#00b1c9","#ea8ca7","#ffd2a0")
+#col.raw <- c("#1d3156","#66c2a5","#ffd92f","#fc8d62","#e78ac3","#8da0cb")
+col.raw <- c("#1d3156","#984ea3","#4daf4a","#ff7f00","#e41a1c","#377eb8")
+
+## cluster 1 v.s median
+highchart() %>% 
+  hc_chart(polar = TRUE, type = "line") %>% 
+  hc_title(text = "Cluster 1 : Multi Resident Housing ") %>% 
+  hc_xAxis(categories = cluster_rader$index,
+           tickmarkPlacement = 'on',
+           lineWidth = 0) %>% 
+  hc_yAxis(gridLineInterpolation = 'polygon',
+           lineWidth = 0,
+           min = 0, max = 1) %>%
+  hc_series(
+    list(
+      name = "cluster 1 ",
+      data = cluster_rader$第一群,
+      pointPlacement = 'on',color=col.raw[2]),
+    list(
+      name = "median ",
+      data = cluster_rader$med,
+      pointPlacement = 'on',color=col.raw[1])
+  )
+
+```
+
+### Disadventaged Family
+```{r}
+## cluster 2 v.s median
+highchart() %>% 
+  hc_chart(polar = TRUE, type = "line") %>% 
+  hc_title(text = "Cluster 2: Disadventaged Family") %>% 
+  hc_xAxis(categories = cluster_rader$index,
+           tickmarkPlacement = 'on',
+           lineWidth = 0) %>% 
+  hc_yAxis(gridLineInterpolation = 'polygon',
+           lineWidth = 0,
+           min = 0, max = 1) %>%
+  hc_series(
+    list(
+      name = "cluster 2 ",
+      data = cluster_rader$第二群,
+      pointPlacement = 'on',color=col.raw[3]),
+    list(
+      name = "median ",
+      data = cluster_rader$med,
+      pointPlacement = 'on',color=col.raw[1])
+  )
+
+
+```
+
+### General Family
+```{r}
+## cluster 3 v.s median
+highchart() %>% 
+  hc_chart(polar = TRUE, type = "line") %>% 
+  hc_title(text = "Cluster 3 : General Family") %>% 
+  hc_xAxis(categories = cluster_rader$index,
+           tickmarkPlacement = 'on',
+           lineWidth = 0) %>% 
+  hc_yAxis(gridLineInterpolation = 'polygon',
+           lineWidth = 0,
+           min = 0, max = 1) %>%
+  hc_series(
+    list(
+      name = "cluster 3 ",
+      data = cluster_rader$第三群,
+      pointPlacement = 'on',color=col.raw[4]),
+    list(
+      name = "median ",
+      data = cluster_rader$med,
+      pointPlacement = 'on',color=col.raw[1])
+  )
+
+```
+
+### Three Generations Family
+```{r}
+## cluster 4 v.s median
+highchart() %>% 
+  hc_chart(polar = TRUE, type = "line") %>% 
+  hc_title(text = "Cluster 4 : Three Generations Family") %>% 
+  hc_xAxis(categories = cluster_rader$index,
+           tickmarkPlacement = 'on',
+           lineWidth = 0) %>% 
+  hc_yAxis(gridLineInterpolation = 'polygon',
+           lineWidth = 0,
+           min = 0, max = 1) %>%
+  hc_series(
+    list(
+      name = "cluster 4 ",
+      data = cluster_rader$第四群,
+      pointPlacement = 'on',color=col.raw[5]),
+    list(
+      name = "median ",
+      data = cluster_rader$med,
+      pointPlacement = 'on',color=col.raw[1])
+  )
+```
+
+### Single Group
+```{r}
+
+## cluster 5 v.s median
+highchart() %>% 
+  hc_chart(polar = TRUE, type = "line") %>% 
+  hc_title(text = "Cluster 5 : Single Group") %>% 
+  hc_xAxis(categories = cluster_rader$index,
+           tickmarkPlacement = 'on',
+           lineWidth = 0) %>% 
+  hc_yAxis(gridLineInterpolation = 'polygon',
+           lineWidth = 0,
+           min = 0, max = 1) %>%
+  hc_series(
+    list(
+      name = "cluster 1 ",
+      data = cluster_rader$第五群,
+      pointPlacement = 'on',color=col.raw[6]),
+    list(
+      name = "median ",
+      data = cluster_rader$med,
+      pointPlacement = 'on',color=col.raw[1])
+  )
+
+```
+
 ### Summary
 ```{r}
-library(highcharter)
-## 讀檔
-cluster_rader<-read.csv("radar_plot.csv",fileEncoding = 'utf8')
+power[power$分群 == "第一群", "分群"] <- "Cluster1"
+power[power$分群 == "第二群", "分群"] <- "Cluster2"
+power[power$分群 == "第三群", "分群"] <- "Cluster3"
+power[power$分群 == "第四群", "分群"] <- "Cluster4"
+power[power$分群 == "第五群", "分群"] <- "Cluster5"
 
-## color
-col.raw <- c("#1d3156","#ff9c63","#7dbfc6","#00b1c9","#ea8ca7","#ffd2a0")
+power %>% 
+  group_by(分群) %>% 
+  summarise(n = n(), mean=mean(戶均用電),med=median(戶均用電) ) %>% 
+  arrange(分群) %>%
+  datatable(colnames=c("Cluster", "Count", "Mean", "Median") )
+```
 
+Column {data-width=350}
+-------------------------------------
+
+### <pp>Outcome</pp>
+
+<pp style="color:#984ea3;"> Cluster1 : Multi Resident Housing </pp>
+
+<ppp>
+很明顯的教育程度是大學以下比例跟六人一宅戶數比例相當高，像是有名的[一戶百口人的洲美里](http://www.chinatimes.com/newspapers/20150527000550-260107)就在這一群中，這群的戶均用電最低，可能是一戶多人所以拉低了戶均用量，偏向outlier的型態
+</ppp>
+
+<pp style="color:#4daf4a;"> Cluster2 : Disadventaged Family</pp>
+
+<ppp>
+A well-off family各項指標皆與一般人差不多的一般家庭
+</ppp>
+
+<pp style="color:#ff7f00;"> Cluster3 :General Family</pp>
+
+<ppp>
+各項指標皆與總體中位數差不多的，故命名為大多數的一般家庭，以台北市而言應該是像小家庭的結構
+</ppp>
+
+<pp style="color:#e41a1c;"> Cluster4 :Three Generations Family</pp>
+
+<ppp>
+教育程度是大學以下比例最低，老年人口比例偏高，而扶養比最高，可猜測也有小孩，房價中位數也是最高，因此可能是偏市中心的小康家庭，這是用電量是屬於偏高的族群
+</ppp>
+
+<pp style="color:#377eb8;">Cluster5 :Single Group</pp>
+
+<ppp>
+這一群的單身率最高，由較高的老人人口比例可以看出，可能有跟父母同住，而用電量是屬於偏高的族群
+</ppp>
+
+Cluster4 vs Cluster5 {#comparison1 data-navmenu="Group Comparison"}
+=====================================   
+ 
+Column {data-width=650}
+-----------------------------------------------------------------------
+
+### Cluster 4: Three Generations Family vs Cluster 5: Single Group
+```{r}
+## cluster 4 v.s  cluster 5
+highchart() %>% 
+  hc_chart(polar = TRUE, type = "line") %>% 
+  hc_title(text = "Cluster 4 vs Cluster 5") %>% 
+  hc_subtitle(text = "Single Office Worker vs Winner at the Game of Life",
+              style=list( color = "#b10026", fontWeight = "bold")) %>% 
+  hc_xAxis(categories = cluster_rader$index,
+           tickmarkPlacement = 'on',
+           lineWidth = 0) %>% 
+  hc_yAxis(gridLineInterpolation = 'polygon',
+           lineWidth = 0,
+           min = 0, max = 1) %>%
+  hc_series(
+    list(
+      name = "cluster 4 - Three Generations Family",
+      data = cluster_rader$第四群,
+      pointPlacement = 'on',color=col.raw[5]),
+    list(
+      name = " cluster 5 - Single Group",
+      data = cluster_rader$第五群,
+      pointPlacement = 'on',color=col.raw[6])
+  )
+
+```
+
+
+Column {data-width=350}
+-----------------------------------------------------------------------
+
+### Description
+<pp style="color:#b10026;text-align:center;"> HIGH Electricity Utilization</pp>
+<pppp style="color:#4d4d4d;"> Three Generations Family vs Single Group </pppp>
+
+-----
+
+<ppp>
+Both Cluster4 and Cluster5 are high electricity utilization regions. But we can tell the different from them. 
+</ppp>
+
+Cluster 1 vs Cluster2 {#comparison2 data-navmenu="Group Comparison"}
+=====================================   
+
+Column {data-width=650}
+-----------------------------------------------------------------------
+
+### Cluster 1:Multi Resident Housing vs Cluster 2: Disadventaged Family
+```{r}
+## cluster 3 v.s  cluster 5
+highchart() %>% 
+  hc_chart(polar = TRUE, type = "line") %>% 
+  hc_title(text = "Cluster 1 vs Cluster 2") %>% 
+  hc_subtitle(text = "Multi Resident Housing vs Disadventaged Family",
+              style=list( color = "#b10026", fontWeight = "bold")) %>% 
+  hc_xAxis(categories = cluster_rader$index,
+           tickmarkPlacement = 'on',
+           lineWidth = 0) %>% 
+  hc_yAxis(gridLineInterpolation = 'polygon',
+           lineWidth = 0,
+           min = 0, max = 1) %>%
+  hc_series(
+    list(
+      name = "cluster 1 - Multi Resident Housing",
+      data = cluster_rader$第一群,
+      pointPlacement = 'on',color=col.raw[2]),
+    list(
+      name = " cluster 2 - Disadventaged Family",
+      data = cluster_rader$第二群,
+      pointPlacement = 'on',color=col.raw[3])
+  )
+
+```
+
+
+Column {data-width=350}
+-----------------------------------------------------------------------
+
+### Description
+
+<pp style="color:#b10026;text-align:center;"> LOW Electricity Utilization</pp>
+<pppp style="color:#4d4d4d;"> Multi Resident Housing vs Disadventaged Family </pppp>
+
+-----
+
+<ppp> Group DINKY use more electricity than group Multi-child Family </ppp>
+
+
+Radar chart {#comparison3 data-navmenu="Group Comparison"}
+=====================================   
+
+### All radar chart
+```{r}
 ## 推疊雷達圖
 highchart() %>% 
   hc_chart(polar = TRUE, type = "line") %>% 
@@ -114,24 +521,24 @@ highchart() %>%
            min = 0, max = 1) %>%
   hc_series(
     list(
-      name = "cluster 1 ",
-      data = cluster_rader$X1,
+      name = "cluster 1-Multi Resident Housing",
+      data = cluster_rader$第一群,
       pointPlacement = 'on',color=col.raw[2]),
     list(
-      name = "cluster 2 - ",
-      data = cluster_rader$X2,
+      name = "cluster 2-Disadventaged Family",
+      data = cluster_rader$第二群,
       pointPlacement = 'on',color=col.raw[3]),
     list(
-      name = "cluster 3 - ",
-      data = cluster_rader$X3,
+      name = "cluster 3-General Family",
+      data = cluster_rader$第三群,
       pointPlacement = 'on',color=col.raw[4]),
     list(
-      name = "cluster 4 -",
-      data = cluster_rader$X4,
+      name = "cluster 4-Three Generations Family",
+      data = cluster_rader$第四群,
       pointPlacement = 'on',color=col.raw[5]),
     list(
-      name = "cluster 5 ",
-      data = cluster_rader$X5,
+      name = "cluster 5-Single Group",
+      data = cluster_rader$第五群,
       pointPlacement = 'on',color=col.raw[6]),
     list(
       name = "Total median",
@@ -141,168 +548,68 @@ highchart() %>%
 
 ```
 
-### Cluster1
-```{r}
-## cluster 1 v.s median
-highchart() %>% 
-  hc_chart(polar = TRUE, type = "line") %>% 
-  hc_title(text = "Cluster 1 : Single Office Worker") %>% 
-  hc_xAxis(categories = cluster_rader$index,
-           tickmarkPlacement = 'on',
-           lineWidth = 0) %>% 
-  hc_yAxis(gridLineInterpolation = 'polygon',
-           lineWidth = 0,
-           min = 0, max = 1) %>%
-  hc_series(
-    list(
-      name = "cluster 1 ",
-      data = cluster_rader$X1,
-      pointPlacement = 'on',color=col.raw[2]),
-    list(
-      name = "median ",
-      data = cluster_rader$med,
-      pointPlacement = 'on',color=col.raw[1])
-  )
+ClusterMap{#clustermap}
+=====================================   
 
-```
+Column {data-width=600}
+-----------------------------------------------------------------------
 
-### Cluster2
-```{r}
-## cluster 2 v.s median
-highchart() %>% 
-  hc_chart(polar = TRUE, type = "line") %>% 
-  hc_title(text = "Cluster 2: General Family") %>% 
-  hc_xAxis(categories = cluster_rader$index,
-           tickmarkPlacement = 'on',
-           lineWidth = 0) %>% 
-  hc_yAxis(gridLineInterpolation = 'polygon',
-           lineWidth = 0,
-           min = 0, max = 1) %>%
-  hc_series(
-    list(
-      name = "cluster 2 ",
-      data = cluster_rader$X2,
-      pointPlacement = 'on',color=col.raw[3]),
-    list(
-      name = "median ",
-      data = cluster_rader$med,
-      pointPlacement = 'on',color=col.raw[1])
-  )
+### <pp>Map</pp>
+<iframe width="100%" height="520" frameborder="0" src="https://ssweetcoww.carto.com/viz/996e544f-759b-439f-bdb0-37fd7b5c0e3c/embed_map" allowfullscreen webkitallowfullscreen mozallowfullscreen oallowfullscreen msallowfullscreen></iframe>
 
-
-```
-
-### Cluster3
-```{r}
-## cluster 3 v.s median
-highchart() %>% 
-  hc_chart(polar = TRUE, type = "line") %>% 
-  hc_title(text = "Cluster 3 : DINKY") %>% 
-  hc_xAxis(categories = cluster_rader$index,
-           tickmarkPlacement = 'on',
-           lineWidth = 0) %>% 
-  hc_yAxis(gridLineInterpolation = 'polygon',
-           lineWidth = 0,
-           min = 0, max = 1) %>%
-  hc_series(
-    list(
-      name = "cluster 3 ",
-      data = cluster_rader$X3,
-      pointPlacement = 'on',color=col.raw[4]),
-    list(
-      name = "median ",
-      data = cluster_rader$med,
-      pointPlacement = 'on',color=col.raw[1])
-  )
-
-```
-
-### Cluster4
-```{r}
-## cluster 4 v.s median
-highchart() %>% 
-  hc_chart(polar = TRUE, type = "line") %>% 
-  hc_title(text = "Cluster 4 : Winner at the Game of Life") %>% 
-  hc_xAxis(categories = cluster_rader$index,
-           tickmarkPlacement = 'on',
-           lineWidth = 0) %>% 
-  hc_yAxis(gridLineInterpolation = 'polygon',
-           lineWidth = 0,
-           min = 0, max = 1) %>%
-  hc_series(
-    list(
-      name = "cluster 4 ",
-      data = cluster_rader$X4,
-      pointPlacement = 'on',color=col.raw[5]),
-    list(
-      name = "median ",
-      data = cluster_rader$med,
-      pointPlacement = 'on',color=col.raw[1])
-  )
-```
-
-### Cluster5
-```{r}
-
-## cluster 5 v.s median
-highchart() %>% 
-  hc_chart(polar = TRUE, type = "line") %>% 
-  hc_title(text = "Cluster 5 : Multi-child Family") %>% 
-  hc_xAxis(categories = cluster_rader$index,
-           tickmarkPlacement = 'on',
-           lineWidth = 0) %>% 
-  hc_yAxis(gridLineInterpolation = 'polygon',
-           lineWidth = 0,
-           min = 0, max = 1) %>%
-  hc_series(
-    list(
-      name = "cluster 1 ",
-      data = cluster_rader$X5,
-      pointPlacement = 'on',color=col.raw[6]),
-    list(
-      name = "median ",
-      data = cluster_rader$med,
-      pointPlacement = 'on',color=col.raw[1])
-  )
-
-```
-
-
-
-
-Column {data-width=350}
+Column {.tabset .tabset-fade data-width=400}
 -------------------------------------
 
-### <pp>Outcome</pp>
+### <pp style="color:#984ea3;"> Cluster1 </pp>
+```{r}
+power %>% filter(分群 == "Cluster1") %>% 
+  ggplot( aes(x=戶均用電)) +
+  geom_histogram(binwidth=40, colour="black", fill="white")+
+  coord_cartesian(xlim = c(400,2510))+
+  labs(title ="Histogram of Multi Resident Housing ", x = "Electricity utilization")#+
+#  geom_vline(data=cdat, aes(xintercept=rating.mean), linetype="dashed", size=1, colour="red")
 
-__Cluster1 : Single Office Worker__
+```
 
-未婚、教育程度低、薪水也較一般人低、且上有長輩需要事奉，為剛出社會的單身上班族，耗電量最低
+### <pp style="color:#4daf4a;"> Cluster2 </pp>
+```{r}
+power %>% filter(分群 == "Cluster2") %>% 
+  ggplot( aes(x=戶均用電)) +
+  geom_histogram(binwidth=25, colour="black", fill="white")+
+  coord_cartesian(xlim = c(400,2510))+
+  labs(title ="Histogram of Disadventaged Family ", x = "Electricity utilization")
 
-</br>
+```
 
-__Cluster2 : General Family__
+### <pp style="color:#ff7f00;"> Cluster3 </pp>
+```{r}
+power %>% filter(分群 == "Cluster3") %>% 
+  ggplot( aes(x=戶均用電)) +
+  geom_histogram(binwidth=25, colour="black", fill="white")+
+  coord_cartesian(xlim = c(400,2510))+
+  labs(title ="Histogram of General Family ", x = "Electricity utilization")
 
-各項指標皆與一般人差不多的一般家庭
+```
 
-</br>
+### <pp style="color:#e41a1c;">Cluster4 </pp>
+```{r}
+power %>% filter(分群 == "Cluster4") %>% 
+  ggplot( aes(x=戶均用電)) +
+  geom_histogram(binwidth=30, colour="black", fill="white")+
+  coord_cartesian(xlim = c(400,2510))+
+  labs(title ="Histogram of Three generations Family ", x = "Electricity utilization")
 
-__Cluster3 : DINKY__
+```
 
-高薪、教育程度高的頂客族，耗電量會較其他族群高
+### <pp style="color:#377eb8;"> Cluster5 </pp>
+```{r}
+power %>% filter(分群 == "Cluster5") %>% 
+  ggplot( aes(x=戶均用電)) +
+  geom_histogram(binwidth=30, colour="black", fill="white")+
+  coord_cartesian(xlim = c(400,2510))+
+  labs(title ="Histogram of Single Group", x = "Electricity utilization")
 
-</br>
-
-__Cluster4 : Winner at the Game of Life__
-
-高薪、教育程度高、住在高級住宅區、已婚、有孩子長輩，耗電量最高
-
-</br>
-
-__Cluster5 : Multi-child Family__
-
-比一般人擁有較多孩子、但薪水與一般人差不多的家庭，可能因為較拮据而耗電量較少
-
+```
 
 Waste of electricity{#waste}
 =====================================   
@@ -313,33 +620,23 @@ Column {data-width=650}
 ### <pp>Map</pp>
 <iframe width="100%" height="520" frameborder="0" src="https://ssweetcoww.carto.com/viz/88e9e3fa-bd96-4203-b68e-c12a33b1d1ee/embed_map" allowfullscreen webkitallowfullscreen mozallowfullscreen oallowfullscreen msallowfullscreen></iframe>
 
-
-```{r}
-
-```
-
 Column {data-width=350}
 -----------------------------------------------------------------------
 
 ### <pp>Outcome</pp>
 
-__Waste of Cluster 1 : Single Office Worker__
+<pp style="color:#e41a1c;">Three Generations Family</pp>
 
-群1為單身的上班族，在群1中教育程度群高的人，耗電量會比普遍群1的人高
+<ppp>群1為單身的上班族，在群1中教育程度群高的人，耗電量會比普遍群1的人高，也就是說群1中浪費電的人是教育程度較高的人！</ppp>
 
-也就是說群1中浪費電的人是教育程度較高的人！
+</br>
 
-__Waste of Cluster 2 : General Family__
+<pp style="color:#377eb8;">Single Group</pp>
 
-群2為一般家庭，若群2中屋齡較高，耗電量會大很多！
+<ppp>群2為一般家庭，若群2中屋齡較高，耗電量會大很多！</ppp>
 
-__Waste of Cluster 3 : DINKY__
-
-群3為頂客族，若群3中的老人比例較少的話，發現耗電量增多！
-
-
-
-
+Conclusion{#conclusion}
+=====================================
 
 
 Sidebar {.sidebar}
@@ -362,31 +659,35 @@ Sidebar {.sidebar}
 
     使用者可以使用我們的產品來督促自己是否為浪費電的人
 
-
-
 ------
 
 <pp>__Members:__</pp>
 
-1. [林芃彣（Nicole）-<br>政大統計所]()
-2. [楊佩雯（Penny）-<br>政大統計所]()
-3. [黃培軒（Bacon）-<br>政大統計所]()
-4. [劉家豪 (Jia-Hau Liu)-<br>台大國企所,政大統計所]()
-5. [林立哲 (Li-Jer, Lin)-<br>信義房屋]()
-
+1. [Peng-Wen,Lin (林芃彣 Nicole）-<br>NCCU Department of Statistics](https://www.facebook.com/profile.php?id=100000344369057)
+2. [Pei Wen,Yang (楊佩雯 Penny）-<br>NCCU Department of Statistics](https://www.facebook.com/yangpenny0903?fref=ufi)
+3. [Pei Shuan - Haung (黃培軒 Bacon）-<br>NCCU Department of Statistics](https://www.facebook.com/profile.php?id=100004119858241)
+4. [Jia-Hau Liu (劉家豪 James)-<br>台大國企所,NCCU Department of Statistics](https://www.facebook.com/profile.php?id=100000914153218)
+5. [Li-Jer, Lin (林立哲))-<br>CITIC Housing](https://www.facebook.com/sweetcow)
 
 </pp>
 
 <style type="text/css">
 
 pp {
-    font-size : 24px;
-    line-height: 25px;
+    font-size : 26px;
+    line-height: 30px;
 }
 
 ppp { 
-    font-size: 20px;
-    line-height: 35px;　　　          　/* 設定文字行距 */
+    font-size: 18px;
+    line-height: 25px;　　　          　/* 設定文字行距 */
     letter-spacing: 6px;　            　/* 設定文字間距 */
 } 
+
+pppp { 
+    font-size: 22px;
+    line-height: 35px;　　　          　/* 設定文字行距 */
+    letter-spacing: 20px;　            　/* 設定文字間距 */
+} 
+
 </style>
