@@ -1,0 +1,340 @@
+---
+title: "2017亞洲跨國黑客松-資料分析"
+author: "Pei Shuan, Haing & Peng-Wen,Lin"
+date: "Aug, 16 ,2017"
+output:
+  html_document: 
+    highlight: haddock
+    theme: spacelab
+    toc: yes
+    toc_depth: 3
+    toc_float: yes
+    code_folding : hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  message = FALSE,
+	warning = FALSE
+  )
+library(data.table)
+library(dplyr)
+library(tidyr)
+library(stringr)
+library(DT)
+library(magrittr)
+library(highcharter)
+library(cluster)
+library(plotly)
+tp_cluster <- fread("processed_data/taipei456_cluster.csv", stringsAsFactors = F) 
+tp_power <- fread("processed_data/2016台北市非營業用電.csv", stringsAsFactors = F) %>%
+  dplyr::select(-city)
+
+```
+
+<br/>
+
+## 變數選取
+
+--------
+
+## 分群
+
+- 指標：
+    1. 1_live_rate(1人一宅宅數比例)
+    2. 6_live_rate(6人以上一宅宅數比例)
+    3. Med_housing_price(房價中位數)
+    4. Under_college%(大學以下比例)
+    5. Dependency_ratio(扶養比)：(青少年人口+老年人口)/壯年人口
+    6. Eldery_one(每戶老年人口數)：每戶平均老年人口數.人./每戶平均人數
+    7. Single_rate(單身率)：1 - 有偶比例
+    8. Electricity(戶均用電)
+    
+```{r}
+tp_cluster %>%  mutate(用電 = log(戶均用電),
+                   扶養比 = (青少年人口+老年人口)/壯年人口,
+                   所得中位log = log10(中位數),
+                   老年比例 = 每戶平均老年人口數.人./每戶平均人數,
+                   單身率  = 1 - 有偶比例...) %>% 
+  select(行政區域,分群,  X1人一宅宅數比例... ,X6人以上一宅宅數比例..., 房價中位數,大學以下比例, 扶養比,老年比例 ,單身率, 戶均用電) -> gogocluster
+names(gogocluster) = c("Region","Cluster", "1_live_rate", "6_live_rate", "Med_housing_price", "Under_college%", "Dependency_ratio","Eldery_one", "Single_rate", "Electricity")
+```
+
+----------
+
+## 決策樹
+
+```{r}
+### 階層式分群
+centered.x <- scale(gogocluster[,-c(1,2)],center=TRUE,scale=TRUE)
+x<-daisy(centered.x, stand=T)
+agn<-agnes(x,metric="euclidean",method="ward")
+plot(agn,which.plots = 2);agn$ac
+
+## scale 跟轉到0,1之間
+gogocluster %>%
+  mutate_each(funs(scale(.,center=TRUE,scale=TRUE)),-c(Region,Cluster))  %>% 
+  gather('index','value',-c(Region,Cluster)) %>% 
+  group_by(index) %>%
+  mutate(value = (value-min(value))/(max(value)-min(value))) %>% 
+  spread(index,value) -> data.h
+
+data.h %>% 
+  select(-1) %>% 
+  group_by(Cluster) %>% 
+  summarise_each(funs(median)) %>% 
+  gather('index','value',-Cluster) %>%
+  spread(Cluster,value) -> cluster_rader
+
+#cluster_rader$mean <- rowMeans(cluster_rader[,-1])
+cluster_rader$med <- apply(cluster_rader[,-1],1,median)
+cluster_rader %<>% 
+  mutate_each(funs(round(.,digits=3)),-index) 
+
+cluster_rader[cluster_rader$index ==  'Electricity',2:7 ] = 
+  cluster_rader[cluster_rader$index ==  'Electricity',2:7 ] + 0.3
+
+cluster_rader = cluster_rader[c(5,2,8,1,7,4,3,6),]
+
+# write.csv(cluster_rader, "processed_data/radar_plot.csv", fileEncoding = "utf8", row.names = F)
+
+## color
+col.raw <- c("#1d3156","#984ea3","#4daf4a","#ff7f00","#e41a1c","#377eb8")
+
+```
+
+### 雷達圖
+- 第一群：Kinship Family 
+- 第二群：Vulnerable Family
+- 第三群：General Family
+- 第四群：Three generations Family
+- 第五群：Single Group
+
+
+```{r }
+## 推疊雷達圖 #####
+highchart() %>% 
+  hc_chart(polar = TRUE, type = "line") %>% 
+  hc_xAxis(categories = cluster_rader$index,
+           tickmarkPlacement = 'on',
+           lineWidth = 0) %>% 
+  hc_yAxis(gridLineInterpolation = 'polygon',
+           lineWidth = 0,
+           min = 0, max = 1) %>%
+  hc_series(
+    list(
+      name = "cluster 1-Kinship Family ",
+      data = cluster_rader$`第一群`,
+      pointPlacement = 'on',color=col.raw[2]),
+    list(
+      name = "cluster 2-Vulnerable Family",
+      data = cluster_rader$`第二群`,
+      pointPlacement = 'on',color=col.raw[3]),
+    list(
+      name = "cluster 3-General Family",
+      data = cluster_rader$`第三群`,
+      pointPlacement = 'on',color=col.raw[4]),
+    list(
+      name = "cluster 4-Three generations Family",
+      data = cluster_rader$`第四群`,
+      pointPlacement = 'on',color=col.raw[5]),
+    list(
+      name = "cluster 5-Single Group",
+      data = cluster_rader$`第五群`,
+      pointPlacement = 'on',color=col.raw[6]),
+    list(
+      name = "Total median",
+      data = cluster_rader$med,
+      pointPlacement = 'on',color= col.raw[1])
+  )
+```
+
+### 用電狀況
+```{r}
+power <-  dplyr::select(tp_cluster,分群, 戶均用電 )
+hchart(power$戶均用電)
+power[power$分群 == "第一群", "分群"] <- "Cluster1"
+power[power$分群 == "第二群", "分群"] <- "Cluster2"
+power[power$分群 == "第三群", "分群"] <- "Cluster3"
+power[power$分群 == "第四群", "分群"] <- "Cluster4"
+power[power$分群 == "第五群", "分群"] <- "Cluster5"
+power %>% group_by(分群) %>% 
+  summarise(mean=mean(戶均用電)) %>%
+  arrange(mean) %>% 
+  hchart("column", hcaes(x=分群,y=mean)) %>% 
+  hc_title(text="title") %>% 
+  hc_yAxis(title=list(text="a"))
+
+p <- plot_ly(power, y = ~戶均用電, 
+             alpha = 0.1, boxpoints = "suspectedoutliers")
+p %>% add_boxplot(x = ~分群)
+
+```
+
+
+--------
+
+## 變異情況
+
+```{r}
+tp_cluster %>% 
+  group_by(分群) %>%
+  summarise(mean(非營業用電_里變異), median(非營業用電_里變異))
+
+tp_cluster %>% filter(分群 == "第四群") %>% select(非營業用電_里變異) %>% 
+  ggplot( aes(x=非營業用電_里變異)) +
+  geom_histogram(binwidth=15, colour="black", fill="white")
+
+tp_cluster %>% filter(分群 == "第四群", 非營業用電_里變異 > 250) %>% 
+  select(行政區域) %>% unlist() -> ta41
+
+tp_cluster %>% filter(分群 == "第四群") %>% select(戶均用電) %>% 
+  ggplot( aes(x=戶均用電)) +
+  geom_histogram(binwidth=40, colour="black", fill="white")
+
+tp_cluster %>% filter(分群 == "第四群", 戶均用電 > 1200) %>% 
+  select(行政區域) %>% unlist() -> ta42
+
+dplyr::setdiff(ta41, ta42)
+dplyr::setdiff(ta42, ta41)
+
+
+tp_cluster %>% filter(分群 == "第五群") %>% select(非營業用電_里變異) %>% 
+  ggplot( aes(x=非營業用電_里變異)) +
+  geom_histogram(binwidth=15, colour="black", fill="white")
+
+tp_cluster %>% filter(分群 == "第五群", 非營業用電_里變異 > 300) %>% 
+  select(行政區域) %>% unlist() -> ta51
+
+
+```
+
+### 全年電度戶均用電
+``` {r}
+tp_power %>%
+  left_join(select(tp_cluster, 1,105), by = '行政區域') %>% 
+  mutate(Electricity_household = gen_sum/戶數) %>% 
+  mutate(Ym = factor(Ym, levels= c('10501', '10503', '10505', '10507', '10509', '10511' ))) ->tp_power2
+  
+  # separate(行政區域, c('區','里'), 3, remove = F) %>% 
+  # group_by(縣市名稱,行政區域, 區, 里) %>% 
+  # summarise(非營業用電_里變異 = sd(非營業用電, na.rm = T)) -> Data_Res_sd
+
+tp_power2 %>% 
+  gruop_by(行政區域) %>% 
+  summarise(max= max(Electricity_household)) %>% View()
+
+tp_power2 %>%  filter(行政區域 %in% c(ta41)) %>%
+  arrange(Ym) %>% 
+  hchart("line", hcaes(group=行政區域, x=Ym, y=gen_sum))
+
+tp_power2 %>%  filter(行政區域 %in% c(ta41)) %>%
+  arrange(Ym) %>% 
+  hchart("line", hcaes(group=行政區域, x=Ym, y=Electricity_household)) %>% 
+  hc_yAxis(min=500, max= 2250)
+
+tp_power2 %>%  filter(行政區域 %in% c(ta51)) %>%
+  arrange(Ym) %>% 
+  hchart("line", hcaes(group=行政區域, x=Ym, y=Electricity_household)) %>% 
+  hc_yAxis( min=500, max= 2250)
+
+
+```
+
+## 離群值EDA
+
+```{r}
+tp_cluster %>%  
+  mutate(用電 = log(戶均用電),
+                   扶養比 = (青少年人口+老年人口)/壯年人口,
+                   所得中位log = log10(中位數),
+                   老年比例 = 每戶平均老年人口數.人./每戶平均人數,
+                   單身率  = 1 - 有偶比例...) %>%
+  dplyr::select(行政區域,分群,變異,離群,人口數,戶均用電,扶養比,所得中位log,老年比例,單身率,青少年人口,壯年人口,老年人口,綜合所得總額,中位數,房價中位數,商家數,公園數,公園坪數,每戶平均人數,博士比例,碩士比例,大學比例,大學以下比例,平均屋齡,零售排名, 每戶平均老年人口數.人.,有偶比例...) -> origin
+# colnames(origin) = c("Region", "Population", "Electricity/household", "teenager", "Prime age", "elderly", "Total income", "Med_Income","Med_housing_price", "Business Sectors", "park", "Park pings", "population/household", "Ph.D.%","Master%", "College%", "Under college%", "House age", "retail rank", "Older_population/household", "Marriage_rate")
+origin$離群[origin$離群 == "TRUE"] = 1
+origin$離群[origin$離群 == "FALSE"] = 0
+origin$離群 <- as.numeric(origin$離群)
+origin %>% group_by(分群) %>% summarise(sum(離群))
+
+origin %>% group_by(分群, 離群) %>% 
+  summarise(筆數 = n(), 總電量 = sum(戶均用電), 平均用電 = mean(戶均用電)) %>% View()
+
+origin %>% filter(離群 == 1) %>% 
+  group_by(分群) %>% 
+  summarise(num = n(),sum=sum(戶均用電)) %>% 
+  merge(filter(origin, 離群 == 0) %>% group_by(分群) %>% 
+  summarise(mean=mean(戶均用電),by= "分群"))   %>% 
+  mutate(waste= sum-num*mean) 
+
+origin %>% 
+  group_by(分群,離群) %>% 
+  summarise(mean(人口數),mean(戶均用電),mean(扶養比),mean(所得中位log),mean(老年比例),mean(單身率),mean(青少年人口),mean(壯年人口),mean(老年人口),mean(綜合所得總額),mean(中位數),mean(房價中位數),mean(商家數),mean(公園數),mean(公園坪數),mean(每戶平均人數),mean(博士比例),mean(碩士比例),mean(大學比例),mean(大學以下比例),mean(平均屋齡),mean(零售排名), mean(每戶平均老年人口數.人.),mean(有偶比例...)) %>% View()
+
+```
+
+
+### 第四群
+#### 目標族群與非目標族群主要差異：
+- 扶養比：用電高的扶養比較低
+- 單身率：用電高的單身率較高
+- 所得中位數：用電高的所得中位數較高
+- 房價中位數
+**推測可能是單身貴族**
+
+```{r}
+origin %>% filter(分群 == "第四群") %>% 
+  ggplot(aes(x=扶養比, fill=as.factor(離群)))+ geom_density(alpha=.3)+
+  scale_colour_discrete(name  ="離群") +
+  theme_grey(base_family="STHeiti")
+origin %>% filter(分群 == "第四群") %>% 
+  ggplot(aes(x=單身率, fill=as.factor(離群)))+ geom_density(alpha=.3)+
+  scale_colour_discrete(name  ="離群") +
+  theme_grey(base_family="STHeiti")
+origin %>% filter(分群 == "第四群") %>% 
+  ggplot(aes(x=中位數, fill=as.factor(離群)))+ geom_density(alpha=.3)+
+  scale_colour_discrete(name  ="離群") +
+  labs(title ="所得中位數") +
+  theme_grey(base_family="STHeiti")
+origin %>% filter(分群 == "第四群") %>% 
+  ggplot(aes(x=房價中位數, fill=as.factor(離群)))+ geom_density(alpha=.3)+
+  scale_colour_discrete(name  ="離群") +
+  theme_grey(base_family="STHeiti")
+
+origin %>% filter(分群 == "第四群") %>% 
+  ggplot(aes(x=中位數, fill=as.factor(離群)))+ geom_density(alpha=.3)+
+  geom_histogram(binwidth=50, alpha=.5, position="identity")
+
+```
+
+### 第三群
+#### 目標族群與非目標族群主要差異：
+- 扶養比：用電高的扶養比較高
+- 房價中位數
+- 所得中位數：用電高的所得中位數較高
+
+```{r}
+origin %>% filter(分群 == "第三群") %>% 
+  ggplot(aes(x=扶養比, fill=as.factor(離群)))+ geom_density(alpha=.3)+
+  scale_colour_discrete(name  ="離群") +
+  theme_grey(base_family="STHeiti")
+origin %>% filter(分群 == "第三群") %>% 
+  ggplot(aes(x=房價中位數, fill=as.factor(離群)))+ geom_density(alpha=.3)+
+  scale_colour_discrete(name  ="離群") +
+  theme_grey(base_family="STHeiti")
+origin %>% filter(分群 == "第三群") %>% 
+  ggplot(aes(x=中位數, fill=as.factor(離群)))+ geom_density(alpha=.3)+
+  scale_colour_discrete(name  ="離群") +
+  labs(title ="所得中位數") +
+  theme_grey(base_family="STHeiti")
+origin %>% filter(分群 == "第三群") %>% 
+  ggplot(aes(x=中位數, fill=as.factor(離群)))+ geom_density(alpha=.3)+
+  geom_histogram(binwidth=30, alpha=.5, position="identity")
+
+
+```
+
+
+
+
+

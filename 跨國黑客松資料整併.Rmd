@@ -1,0 +1,325 @@
+---
+title: "2017亞洲跨國黑客松-資料整併"
+author: "Pei Wen,Yang & Peng-Wen,Lin "
+date: "Aug, 2 ,2017"
+output:
+  html_document: 
+    highlight: haddock
+    theme: spacelab
+    toc: yes
+    toc_depth: 3
+    toc_float: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  message = FALSE,
+	warning = FALSE
+  )
+library(data.table)
+library(dplyr)
+library(tidyr)
+library(stringr)
+library(DT)
+library(magrittr)
+
+```
+
+<br/>
+
+## 擁有資料
+- 以下為匯入各個前置概略處理完的資料集，以里為單位合併成分析資料
+
+> 資料盤點
+
+1. 台電資料
+2. 所得稅總額資料
+3. 教育程度資料
+4. 戶籍人口資料
+5. 實價登錄資料
+6. 零售金額排名
+7. 商店數資料
+8. 住宅資料
+9. 公園數與坪資料
+
+> 資料使用
+
+- 地區：台北市
+- 時間：七八月份
+
+--------
+
+- 讀入村里清單資料且選取台北市
+
+```{r}
+tp_village <- read.csv("processed_data/全台村里清單.csv", fileEncoding = "utf8", stringsAsFactors = F) %>% 
+  filter(縣市名稱 == "台北市")
+```
+
+--------
+
+## 1. 台電電力
+```{r}
+fread("processed_data/2016台北市非營業用電.csv") %>% 
+  dplyr::select(-city) %>% 
+  filter(Ym==10507) -> tp_power
+head(tp_power)
+```
+
+--------
+
+## 2. 所得稅
+```{r}
+tp_income <- read.csv("processed_data/2013台北市綜合所得.csv", fileEncoding = "utf8", stringsAsFactors = F)
+head(tp_income)
+```
+
+--------
+
+## 3. 教育程度
+
+```{r}
+tp_edu <- read.csv("processed_data/2016六都教育程度.csv", fileEncoding = "utf8", stringsAsFactors = F) %>% 
+  filter(縣市 == "台北市") 
+
+tp_edu %<>% 
+  mutate(博士 = 博畢 + 博肄,
+         碩士 = 碩畢 + 碩肄,
+         大學 = 大畢 + 大肄,
+         大學以下 = 二畢 + 二肄 + 後二畢 + 後二肄 + 前三肄 + 高畢 + 高肄 + 職畢 + 職肄 + 
+                    國畢 + 國肄 + 初畢 + 初肄 + 小畢 + 小肄 + 自修 + 不識) %>% 
+  dplyr::select(統計年., 縣市, 行政區域, 總計., 博士, 碩士, 大學, 大學以下) %>% 
+  mutate(博士比例 = round(博士/總計.,4),
+         碩士比例 = round(碩士/總計.,4),
+         大學比例 = round(大學/總計.,4),
+         大學以下比例 = round(大學以下/總計.,4)) 
+head(tp_edu)
+```
+
+--------
+
+## 4. 戶籍人口
+
+### 人口統計
+```{r eval=FALSE}
+ppl %<>% 
+  mutate(縣市=substr(area,1,3) ,行政區域 = paste(substr(area,4,length(area)),sub_area,sep = '')) %>% select(year,縣市,行政區域, household, ppl.total, gender, age, counts )
+colnames(ppl) <- c("統計年月","縣市","行政區域","戶數","總人數","性別","年齡","人數")
+ 
+ppl %>% 
+  filter(縣市=="臺北市" & 統計年月==10407) -> tp_ppl
+rm(ppl)
+tp_ppl %<>% 
+  group_by(統計年月, 縣市, 行政區域, 戶數, 總人數, 年齡) %>% 
+  summarise(num = sum(人數)) %>% 
+  spread(年齡, num) %>% 
+  mutate(青少年人口 =`0` + `1` + `2` + `3` + `4` + `5` + `6` + `7` + `8` + `9` + `10` +
+                    `11` + `12` + `13` + `14` + `15` ,
+         壯年人口 = `16` + `17` + `18` + `19` + `20` + `21` + `22` + `23` + `24` + `25` + `26` + 
+           `27` + `28` + `29` + `30` +`31` + `32` + `33` + `34` + `35` + `36` + `37` + `38` + 
+           `39` + `40`+`41` + `42` + `43` + `44` + `45` + `46` + `47` + `48` + `49` + `50` +
+           `51` + `52` + `53` + `54` + `55` + `56` + `57` + `58` + `59` + `60` + `61` + `62` + 
+           `63` + `64` + `65`,
+         老年人口 = `66` + `67` + `68` + `69` + `70` +
+               `71` + `72` + `73` + `74` + `75` + `76` + `77` + `78` + `79` + `80` +
+               `81` + `82` + `83` + `84` + `85` + `86` + `87` + `88` + `89` + `90` +
+               `91` + `92` + `93` + `94` + `95` + `96` + `97` + `98` + `99` + `100`)
+tp_ppl[,c(1:5,107:110)]->tp_ppl
+write.csv("/Users/yangpeiwen/Documents/政大/台電比賽/年紀整理完成.csv")
+
+## 村里清單有，村里人口數單一年齡人口數沒有：
+dplyr::setdiff(tp_business$行政區域,tp_ppl$行政區域)
+### 村里人口數單一年齡人口數有，村里清單沒有：
+dplyr::setdiff(tp_ppl$行政區域,tp_business$行政區域)
+```
+
+- 匯入處理好資料
+```{r}
+tp_age <- fread("processed_data/年紀整理完成.csv") %>% dplyr::select(-c(1, 6))
+```
+
+--------
+
+## 5. 實價登錄
+```{r}
+tp_price<-fread("processed_data/台北市實價登錄.csv")
+colnames(tp_price) = c("region", "房價筆數", "房價中位數", "房價平均數")
+tp_house<-fread("processed_data/台北市實價登錄全檔.csv")
+tp_house %<>%  
+  mutate(屋齡= round(105-建築完成年月/10000,0),
+           坪數= 建物移轉總面積平方公尺/3.3 )  %>%
+  group_by(里) %>%
+  summarise(平均屋齡=mean(屋齡,na.rm=TRUE),中位屋齡=median(屋齡,na.rm=TRUE),
+         平均坪數=mean(坪數,na.rm=TRUE),中位坪數=median(坪數,na.rm=TRUE))
+head(tp_house)
+
+dplyr::setdiff(tp_price$region,tp_village$行政區域)
+dplyr::setdiff(tp_village$行政區域,tp_price$region)
+
+dplyr::setdiff(tp_house$里,tp_village$行政區域)
+dplyr::setdiff(tp_village$行政區域,tp_house$里)
+
+```
+
+--------
+
+## 6. 零售業金額排名
+
+```{r eval=FALSE}
+## 零售業排名資料 X_ _2是排名序
+retail <- fread("original_data/table_2016invoice.csv") 
+filter(retail,!countyname %in% c("金門縣", "連江縣", "澎湖縣")) %>% 
+  mutate(region = paste0(townname,villname)) %>% 
+  dplyr::select("countyname","townname", "villname","region" , "X__2") -> retail
+tp_retail <- filter(retail, countyname == "臺北市")
+six <- read.csv("六都村里清單.csv", fileEncoding = "utf8", stringsAsFactors = F)
+tp_village <- filter(six, 縣市名稱 == "台北市") 
+dplyr::setdiff(tp_retail$region, tp_village$行政區域)
+dplyr::setdiff(tp_village$行政區域, tp_retail$region)
+tp_retail[tp_retail$region == "萬華區糖[部]里", "region"] <- "萬華區糖廍里"
+### 金額排名有42個是0
+sum(tp_retail==0)
+# write.csv(tp_retail, "台北市零售金額排行.csv", fileEncoding = "utf8", row.names = F)
+```
+
+- 讀入上方處理好的零售金額排行資料
+
+```{r}
+tp_retail <- read.csv("processed_data/台北市零售金額排行.csv", fileEncoding = "utf8") %>% 
+  dplyr::select(4,5) 
+names(tp_retail) = c("行政區域", "零售排名")
+```
+
+--------
+
+## 7. 商店數
+```{r eval=FALSE}
+bacon <- fread("original_data/Commerical_num.csv") %>% filter(市 == "臺北市")
+
+### 改難字 ###
+bacon[bacon$里 == "<U+6FD3>洞里", 4] <- "濓洞里"
+bacon[bacon$里 == "<U+6FD3>新里", 4] <- "濓新里"
+bacon[bacon$里 == "<f3><U+00BF><U+00BE><U+00B5>寮里", 4] <- "獇寮里"
+bacon[bacon$里 == "<U+5CEF>廷里", 4] <- "峯廷里"
+
+bacon[bacon$里 == "糖<U+5ECD>里", 4] <- "糖廍里"
+bacon[bacon$里 == "石<f0><U+00A5><U+0095><U+00A2>里", 4] <- "石𥕢里"
+ bacon[bacon$里 == "爪<U+5CEF>里", 4] <- "爪峯里"
+ bacon[bacon$里 == "永<U+8218>里", 4] <- "永舘里"
+ bacon[bacon$里 == "崁<U+811A>里", 4] <- "崁脚里"
+ bacon[bacon$里 == "五<U+5CEF>里", 4] <- "五峯里"
+ bacon[bacon$里 == "新<U+5ECD>里", 4] <- "新廍里"
+ bacon[bacon$里 == "灰<f3><U+00BF><U+00BE><U+00A8>里", 4] <- "灰磘里"
+ bacon[bacon$里 == "瓦<f3><U+00BF><U+00BE><U+00A8>里", 4] <- "瓦磘里"
+
+ bacon %>% mutate(行政區域=paste(區,里,sep = '')) %>% group_by(市,行政區域) %>% summarise(商家數 = n()) %>% filter(市=="臺北市")  -> tp_business
+ tp_business[tp_business$行政區域 == "萬華區糖廍里", ]
+ 
+ write.csv(tp_business, "台北市商家數.csv", fileEncoding = "utf8", row.names = F)
+```
+
+- 讀入上述處理好的資料
+```{r}
+tp_business <- read.csv("processed_data/台北市商家數.csv",  fileEncoding = "utf8")
+```
+
+
+--------
+
+## 8. 住宅
+```{r}
+tp_resident <- read.csv("processed_data/resident.csv",fileEncoding = 'big5', stringsAsFactors = F) %>% mutate(行政區域 = paste0(鄉鎮,地區))
+
+dplyr::setdiff(tp_resident$行政區域,tp_village$行政區域)
+dplyr::setdiff(tp_village$行政區域,tp_resident$行政區域)
+tp_resident[tp_resident$行政區域 == "萬華區糖部里", "行政區域"] <- "萬華區糖廍里"
+
+```
+
+--------
+
+## 9. 公園數與坪
+```{r}
+tp_park <- read.csv("processed_data/臺北市鄰里公園點位資料2015.csv",fileEncoding = "big5")
+tp_park %>% mutate(行政區域 = paste(District_Name,Li_Name,sep = '')) %>% group_by(行政區域) %>% 
+  summarise(公園數=n(),
+            公園坪數=sum(Land.area.Ping.)) -> tp_park
+tp_park[tp_park$行政區域 == "萬華區糖蔀里", 1] <- "萬華區糖廍里"
+
+```
+
+--------
+
+## 資料合併
+- 合併十個資料集
+- NA值補零：公園數、公園坪數、商家數
+
+```{r}
+tp_merge <-  merge(tp_power, tp_income[,-1] , by="行政區域", all.x = T) %>% 
+  merge(tp_edu[,-c(1,2)] ,by="行政區域" , all.x = T) %>% 
+  merge(tp_house, by.x="行政區域", by.y="里", all.x=T) %>% 
+  merge(tp_retail,  by="行政區域",  all.x=T) %>%
+  merge(tp_park, by="行政區域",  all.x=T) %>%  
+  merge(tp_business[,-1], by="行政區域",  all.x=T) %>%
+  merge(tp_price, by.x="行政區域",by.y="region", all.x=T) %>%  
+  merge(tp_resident[,-c(1,2,3)], by="行政區域", all.x=T) %>% 
+  merge(select(tp_age, -c(1,2)) , by="行政區域", all.x=T) %>% 
+  mutate(戶均用電 = gen_sum/戶數, 每戶平均人數 = 人口數/戶數) 
+
+
+dplyr::setdiff(tp_merge$行政區域,tp_village$行政區域)
+dplyr::setdiff(tp_village$行政區域,tp_merge$行政區域)
+
+### NA補零
+tp_merge$公園數[is.na(tp_merge$公園數)] <- 0 
+tp_merge$公園坪數[is.na(tp_merge$公園坪數)] <- 0 
+tp_merge$商家數[is.na(tp_merge$商家數)] <- 0 
+
+# final[,-c(2,3,33,109:110)]->final
+# final[,-c(21)]->final
+# final[,-c(63:77)]->final2
+# final2[,-c(49:62)]->final3
+# final3[,-17]->final4
+
+```
+
+## 資料預處理
+- 有遺漏值的欄位：`"平均屋齡"   "中位屋齡"   "平均坪數"   "中位坪數"   "房價筆數"   "房價中位數"  "房價平均數"`
+- `北投區洲美里` :北投區吉慶里、北投區建民里
+- `士林區平等里` :士林區溪山里、士林區菁山里  
+- `文山區老泉里` :文山區樟腳里、文山區指南里
+
+```{r}
+### 處理遺漏值
+index <- sapply(1:dim(tp_merge)[2], function(x) sum(is.na(tp_merge[,x])) )
+na <- which(index>0)
+n1 <- which(tp_merge$行政區域 == "北投區洲美里")
+n2 <- which(tp_merge$行政區域 == "士林區平等里")
+n3 <- which(tp_merge$行政區域 == "文山區老泉里")
+
+#"北投區洲美里" 
+tp_merge %>% filter(行政區域 %in% c("北投區吉慶里","北投區建民里")) %>%
+  summarise(平均屋齡 = mean(平均屋齡),中位屋齡= median(中位屋齡),
+                平均坪數=mean(平均坪數), 中位坪數=median(中位坪數),筆數 = 0,
+                房價中位數= median(房價中位數),房價平均數= mean(房價平均數)) %>% 
+  unlist()-> a1
+
+#"士林區平等里" 
+tp_merge %>% filter(行政區域 %in% c("士林區溪山里","士林區菁山里")) %>% 
+  summarise(平均屋齡 = mean(平均屋齡),中位屋齡= median(中位屋齡),
+                平均坪數=mean(平均坪數), 中位坪數=median(中位坪數), 筆數 = 0,
+                房價中位數= median(房價中位數),房價平均數= mean(房價平均數)) %>% 
+    unlist()-> a2
+#"文山區老泉里"
+tp_merge %>% filter(行政區域 %in% c("文山區樟腳里","文山區指南里")) %>%
+  summarise(平均屋齡 = mean(平均屋齡),中位屋齡= median(中位屋齡)) %>%   unlist()-> a3
+
+tp_merge[n1, na] <- a1
+tp_merge[n2, na] <- a2
+tp_merge[n3, na[1:2]] <- a3
+
+# write.csv(tp_merge,"taipei456.csv",fileEncoding = 'utf8', row.names = F)
+
+```
+
+

@@ -19,7 +19,7 @@ library(highcharter)
 library(DT)
 # 讀入分群完的原始資料
 tp_cluster <- fread("processed_data/taipei456_cluster.csv")
-tp_cluster %>% dplyr::select(1,"戶均用電", "分群") -> power
+power <-  tp_cluster %>% dplyr::select(1,"戶均用電", "分群")
 # 雷達圖資料
 cluster_rader<-read.csv("processed_data/radar_plot.csv",fileEncoding = 'utf8')
 # 四國資料 
@@ -129,10 +129,10 @@ Analysis Process {#analysis2 data-navmenu="Analysis"}
 <h1 style="color:#b10026;"> Analysis Process </h1>
 
 <pppp> 1. Cleane nine data set separately.</pppp></br>
-<pppp> 2. Merge data that cleaned together with 111 variables</pppp></br>
-<pppp> 3. Use "Greedy Search" and "K-means" to filter out useful variables</pppp></br>
-<pppp> 4. </pppp></br>
-<pppp> 5. </pppp></br>
+<pppp> 2. Merge data that cleaned together with 111 variables.</pppp></br>
+<pppp> 3. Use "Greedy Search" and "K-means" to filter out useful variables.</pppp></br>
+<pppp> 4. Calculate each region variationlate, and find the target</pppp></br>
+<pppp> 5. Use "Decision tree " to find the </pppp></br>
 
 <br/>
 
@@ -140,10 +140,10 @@ Analysis Process {#analysis2 data-navmenu="Analysis"}
 
 <br/>
 
-Merged Data {#analysis1 data-navmenu="Analysis"}
+Processed Data {#analysis1 data-navmenu="Analysis"}
 =====================================   
 
-### Merged Data 
+### Processed Data 
 
 ```{r}
 tp_cluster %>%  
@@ -151,8 +151,8 @@ tp_cluster %>%
 colnames(origin) = c("Region", "Population", "Electricity/household", "teenager", "Prime age", "elderly", "Total income", "Med_Income","Med_housing_price", "Business Sectors", "park", "Park pings", "population/household", "Ph.D.%","Master%", "College%", "Under college%", "House age", "retail rank", "Older_population/household", "Marriage_rate")
 
 origin %>% 
-  DT::datatable(
-    options = list(pageLength = 30)) %>% formatRound(c(2,13:18,20,21),digits = 2)
+  DT::datatable(options = list(pageLength = 30)) %>% 
+  formatRound(c(2,13:18,20,21),digits = 2)
 ```
 
 
@@ -373,7 +373,7 @@ power %>%
   group_by(分群) %>% 
   summarise(n = n(), mean=mean(戶均用電),med=median(戶均用電) ) %>% 
   arrange(分群) %>%
-  datatable(colnames=c("Cluster", "Count", "Mean", "Median") )
+  datatable(options = list(pageLength = 5) ,colnames=c("Cluster", "Count", "Mean", "Median"))
 ```
 
 Column {data-width=350}
@@ -390,7 +390,7 @@ Column {data-width=350}
 <pp style="color:#4daf4a;"> Cluster2 : Disadventaged Family</pp>
 
 <ppp>
-A well-off family各項指標皆與一般人差不多的一般家庭
+其實大部分指標跟總中位數很接近，但可以發現在教育程度是大學以下比例偏高，而房價中位數偏低，所以我們認為是狀況偏向些為弱勢家庭，位置也是在台北市中心偏外圍的地區。
 </ppp>
 
 <pp style="color:#ff7f00;"> Cluster3 :General Family</pp>
@@ -410,6 +410,18 @@ A well-off family各項指標皆與一般人差不多的一般家庭
 <ppp>
 這一群的單身率最高，由較高的老人人口比例可以看出，可能有跟父母同住，而用電量是屬於偏高的族群
 </ppp>
+
+Five Groups {#comparison_T data-navmenu="Group Comparison"}
+=====================================   
+
+<pp style="color:#b10026;"> Electricity use of per household in five groups </pp>
+```{r}
+names(power) = c("Region","Electricity_household",  "Cluster")
+p <- plot_ly(power, y = ~Electricity_household,  
+             alpha = 0.1, boxpoints = "suspectedoutliers" )
+p %>% add_boxplot(x = ~Cluster) 
+```
+
 
 Cluster4 vs Cluster5 {#comparison1 data-navmenu="Group Comparison"}
 =====================================   
@@ -548,6 +560,8 @@ highchart() %>%
 
 ```
 
+
+
 ClusterMap{#clustermap}
 =====================================   
 
@@ -555,15 +569,15 @@ Column {data-width=600}
 -----------------------------------------------------------------------
 
 ### <pp>Map</pp>
-<iframe width="100%" height="520" frameborder="0" src="https://ssweetcoww.carto.com/viz/996e544f-759b-439f-bdb0-37fd7b5c0e3c/embed_map" allowfullscreen webkitallowfullscreen mozallowfullscreen oallowfullscreen msallowfullscreen></iframe>
+<iframe width="100%" height="520" frameborder="0" src="https://ssweetcoww.carto.com/viz/38466df2-caea-44e5-9b53-4bfd341388a5/embed_map" allowfullscreen webkitallowfullscreen mozallowfullscreen oallowfullscreen msallowfullscreen></iframe>
 
 Column {.tabset .tabset-fade data-width=400}
 -------------------------------------
 
 ### <pp style="color:#984ea3;"> Cluster1 </pp>
 ```{r}
-power %>% filter(分群 == "Cluster1") %>% 
-  ggplot( aes(x=戶均用電)) +
+power %>% filter(Cluster == "Cluster1") %>% 
+  ggplot( aes(x=Electricity_household)) +
   geom_histogram(binwidth=40, colour="black", fill="white")+
   coord_cartesian(xlim = c(400,2510))+
   labs(title ="Histogram of Multi Resident Housing ", x = "Electricity utilization")#+
@@ -573,8 +587,8 @@ power %>% filter(分群 == "Cluster1") %>%
 
 ### <pp style="color:#4daf4a;"> Cluster2 </pp>
 ```{r}
-power %>% filter(分群 == "Cluster2") %>% 
-  ggplot( aes(x=戶均用電)) +
+power %>% filter(Cluster == "Cluster2") %>% 
+  ggplot( aes(x=Electricity_household)) +
   geom_histogram(binwidth=25, colour="black", fill="white")+
   coord_cartesian(xlim = c(400,2510))+
   labs(title ="Histogram of Disadventaged Family ", x = "Electricity utilization")
@@ -583,8 +597,8 @@ power %>% filter(分群 == "Cluster2") %>%
 
 ### <pp style="color:#ff7f00;"> Cluster3 </pp>
 ```{r}
-power %>% filter(分群 == "Cluster3") %>% 
-  ggplot( aes(x=戶均用電)) +
+power %>% filter(Cluster == "Cluster3") %>% 
+  ggplot( aes(x=Electricity_household)) +
   geom_histogram(binwidth=25, colour="black", fill="white")+
   coord_cartesian(xlim = c(400,2510))+
   labs(title ="Histogram of General Family ", x = "Electricity utilization")
@@ -593,8 +607,8 @@ power %>% filter(分群 == "Cluster3") %>%
 
 ### <pp style="color:#e41a1c;">Cluster4 </pp>
 ```{r}
-power %>% filter(分群 == "Cluster4") %>% 
-  ggplot( aes(x=戶均用電)) +
+power %>% filter(Cluster == "Cluster4") %>% 
+  ggplot( aes(x=Electricity_household)) +
   geom_histogram(binwidth=30, colour="black", fill="white")+
   coord_cartesian(xlim = c(400,2510))+
   labs(title ="Histogram of Three generations Family ", x = "Electricity utilization")
@@ -603,8 +617,8 @@ power %>% filter(分群 == "Cluster4") %>%
 
 ### <pp style="color:#377eb8;"> Cluster5 </pp>
 ```{r}
-power %>% filter(分群 == "Cluster5") %>% 
-  ggplot( aes(x=戶均用電)) +
+power %>% filter(Cluster == "Cluster5") %>% 
+  ggplot( aes(x=Electricity_household)) +
   geom_histogram(binwidth=30, colour="black", fill="white")+
   coord_cartesian(xlim = c(400,2510))+
   labs(title ="Histogram of Single Group", x = "Electricity utilization")
@@ -618,7 +632,7 @@ Column {data-width=650}
 -----------------------------------------------------------------------
 
 ### <pp>Map</pp>
-<iframe width="100%" height="520" frameborder="0" src="https://ssweetcoww.carto.com/viz/88e9e3fa-bd96-4203-b68e-c12a33b1d1ee/embed_map" allowfullscreen webkitallowfullscreen mozallowfullscreen oallowfullscreen msallowfullscreen></iframe>
+<iframe width="100%" height="520" frameborder="0" src="https://ssweetcoww.carto.com/viz/aade6337-e56d-427e-989a-884f9f8a502d/embed_map" allowfullscreen webkitallowfullscreen mozallowfullscreen oallowfullscreen msallowfullscreen></iframe>
 
 Column {data-width=350}
 -----------------------------------------------------------------------
@@ -627,13 +641,13 @@ Column {data-width=350}
 
 <pp style="color:#e41a1c;">Three Generations Family</pp>
 
-<ppp>群1為單身的上班族，在群1中教育程度群高的人，耗電量會比普遍群1的人高，也就是說群1中浪費電的人是教育程度較高的人！</ppp>
+<ppp>Group4...</ppp>
 
 </br>
 
 <pp style="color:#377eb8;">Single Group</pp>
 
-<ppp>群2為一般家庭，若群2中屋齡較高，耗電量會大很多！</ppp>
+<ppp>Group5...</ppp>
 
 Conclusion{#conclusion}
 =====================================
