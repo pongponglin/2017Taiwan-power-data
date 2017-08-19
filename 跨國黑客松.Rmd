@@ -673,7 +673,7 @@ Sidebar {.sidebar}
 <h2 style="color:#ef6034;">__U-Optimizer__</h2> 
 
 
-<ppp>透明治理</ppp>
+<ppp>Government Transparency</ppp>
 
 政府端
 
