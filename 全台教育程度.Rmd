@@ -1,0 +1,232 @@
+---
+title: "教育程度資料"
+author: "ponponlin"
+date: "2017年7月9日"
+output: 
+  html_document: 
+    highlight: haddock
+    theme: spacelab
+    toc: yes
+    toc_depth: 3
+    toc_float: yes
+---
+
+<br/>
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  message = FALSE,
+  warning = FALSE )
+library(dplyr)
+```
+
+<br/>
+
+## 1. 資料來源
+- [政府開放資料平台-各村里教育程度資料](http://data.gov.tw/node/8409)
+- 擁有年度：`102`, `104`, `105`年度
+- 教育程度為全年性，也就是每個村里每個月有相同教育程度
+
+------------
+
+## 2. 資料處理 (2015)
+- 處理 2015 年 (104年度) 全台各村里教育程度資料
+- 102 資料編碼為`UTF-16`
+- 104 與 105 年資料編碼為`UTF-8`
+
+```{r}
+# 讀入資料第一行看看
+readLines(file("original_data/2015各村里教育程度資料.csv", encoding = "UTF-8"), n = 1)
+# 讀入2015年資料
+# edu <- read.csv("original_data/2015各村里教育程度資料.csv",skip = 1, stringsAsFactors = F, fileEncoding = "UTF8")
+
+# 讀入2016年資料
+edu2 <- read.csv("original_data/2016各村里教育程度.csv",skip = 1, stringsAsFactors = F, fileEncoding = "UTF8")
+head(edu2)
+colnames(edu2)
+```
+
+----------------
+
+### 調整欄位
+- 將資料中男女人數合併
+- 原始欄位為區域別、村里名稱，`區域別`為縣市+鄉鎮市區，調整為縣市，鄉鎮市區，村里（行政區域）
+
+```{r}
+edu2 %>% 
+  mutate( 博畢 = 博畢_男.+博畢_女.,博肄 = 博肄_男.+博肄_女.,
+          碩畢 = 碩畢_男.+碩畢_女.,
+          碩肄 = 碩肄_男.+碩肄_女.,
+          大畢 = 大畢_男.+大畢_女.,
+          大肄 = 大肄_男.+大肄_女.,
+          二畢 = 二畢_男.+二畢_女.,
+          二肄 = 二肄_男.+二肄_女.,
+          後二畢 = 後二畢_男.+後二畢_女.,
+          後二肄 = 後二肄_男.+後二肄_女.,
+          前三肄 = 前三肄_男.+前三肄_女.,
+          高畢 = 高畢_男.+高畢_女.,
+          高肄 = 高肄_男.+高肄_女.,
+          職畢 = 職畢_男.+職畢_女.,
+          職肄 = 職肄_男.+職肄_女.,
+          國畢 = 國畢_男.+國畢_女.,
+          國肄 = 國肄_男.+國肄_女.,
+          初畢 = 初畢_男.+初畢_女.,
+          初肄 = 初肄_男.+初肄_女.,
+          小畢 = 小畢_男.+小畢_女.,
+          小肄 = 小肄_男.+小肄_女.,
+          自修 = 自修_男.+自修_女.,
+          不識 = 不識_男.+不識_女 ,
+          縣市 = substr(區域別., start = 1,stop = 3),
+          鄉鎮市區 = substr(區域別., start = 4,stop = nchar(區域別.))) %>%
+          #行政區域 = paste(substr(區域別.,4,nchar(區域別.)), 村里名稱., sep = '') ) %>% 
+  #select(c(1,74,75,4,51:73)) 
+  dplyr::select(c(1,74,75,3,4,51:73))-> edu2016
+head(edu2016)
+```
+
+--------------
+
+## 3. 與村里清單做比較
+
+### 高雄市
+- 兩個資料用的皆是難字
+- 教育程度資料將三民區變成三民一三民二，鳳三區變成鳳三一鳳山二
+- 修改完之後教育程度的村里與村里清單的相同
+- 同一年度的各里月資料皆相同，考慮到每月的變化量不會太大
+- 匯出成編碼 `UTF8`
+
+```{r}
+edu2016 %>% filter(縣市 == "高雄市") %>% 
+  mutate(行政區域 = paste0(鄉鎮市區, 村里名稱.)) %>% 
+  dplyr::select(1,2,29,5:28)-> ks_edu
+### 匯入處理過後的高雄市各村里清單
+ks_village <- read.csv('高雄市村里清單.csv', fileEncoding = 'UTF8', header = T, stringsAsFactors = F)
+### 教育程度資料有，村里清單沒有：
+dplyr::setdiff(ks_edu$行政區域, ks_village$行政區域)
+### 村里清單有，教育程度資料沒有：
+dplyr::setdiff(ks_village$行政區域, ks_edu$行政區域)
+
+### 更改三民區 鳳山區
+edu2016 %>% filter(縣市 == "高雄市") -> ks_edu
+ks_edu[ks_edu$鄉鎮市區 %in% c("三民一","三民二"),"鄉鎮市區"] <- "三民區"
+ks_edu[ks_edu$鄉鎮市區 %in% c("鳳山一","鳳山二"),"鄉鎮市區"] <- "鳳山區"
+ks_edu %>%   mutate(行政區域 = paste0(鄉鎮市區, 村里名稱.)) %>% 
+  dplyr::select(1,2,29,5:28)-> ks_edu
+
+### 匯出
+# write.csv(ks_edu, "2015高雄市教育程度.csv", fileEncoding = "UTF8", row.names = F)
+
+```
+
+---------
+
+### 台中市
+
+```{r}
+edu2016 %>% filter(縣市 == "臺中市") %>% 
+  mutate(行政區域 = paste0(鄉鎮市區, 村里名稱.)) %>% 
+  dplyr::select(1,2,29,5:28)-> tc_edu
+tc_edu$行政區域 <-  gsub("　","",tc_edu$行政區域)
+tc_edu[tc_edu$縣市 == "臺中市", "縣市"] <- "台中市"
+### 匯入處理過後的台中市各村里清單
+tc_village <- read.csv('台中市村里清單.csv', fileEncoding = 'UTF8', header = T, stringsAsFactors = F)
+### 教育程度資料有，村里清單沒有：
+a <- dplyr::setdiff(tc_edu$行政區域, tc_village$行政區域) ; a
+### 村里清單有，教育程度資料沒有：
+dplyr::setdiff(tc_village$行政區域, tc_edu$行政區域)
+tc_edu[tc_edu$行政區域 == a ,"行政區域"] <- "大安區龜壳里"
+### 匯出
+# write.csv(tc_edu, "2015台中市教育程度.csv", fileEncoding = "UTF8", row.names = F)
+```
+
+-------
+
+### 新北市
+
+```{r}
+edu2016 %>% filter(縣市 == "新北市") %>% 
+  mutate(行政區域 = paste0(鄉鎮市區, 村里名稱.)) %>% 
+  dplyr::select(1,2,29,5:28)-> np_edu
+### 匯入處理過後的新北市各村里清單
+six <- read.csv("六都村里清單.csv", fileEncoding = "utf8", stringsAsFactors = F)
+np_village <- six %>% filter(縣市名稱 == "新北市")
+### 教育程度資料有，村里清單沒有：
+a <- dplyr::setdiff(np_edu$行政區域, np_village$行政區域) ; a
+### 村里清單有，教育程度資料沒有：
+dplyr::setdiff(np_village$行政區域, np_edu$行政區域)
+np_edu[np_edu$行政區域 == a[1] ,"行政區域"] <- "中和區瓦磘里"
+np_edu[np_edu$行政區域 == a[2] ,"行政區域"] <- "中和區灰磘里"
+np_edu[np_edu$行政區域 == a[3] ,"行政區域"] <- "樹林區獇寮里"
+
+```
+
+---------
+
+### 台南市
+
+```{r}
+edu2016 %>% filter(縣市 == "臺南市") %>% 
+  mutate(行政區域 = paste0(鄉鎮市區, 村里名稱.)) %>% 
+  dplyr::select(1,2,29,5:28)-> tn_edu
+tn_edu$行政區域 <-  gsub("　","",tn_edu$行政區域)
+tn_edu[tn_edu$縣市 == "臺南市", "縣市"] <- "台南市"
+tn_village <- six %>% filter(縣市名稱 == "台南市")
+### 教育程度資料有，村里清單沒有：
+a <- dplyr::setdiff(tn_edu$行政區域, tn_village$行政區域) ; a
+### 村里清單有，教育程度資料沒有：
+dplyr::setdiff(tn_village$行政區域, tn_edu$行政區域)
+tn_edu[tn_edu$行政區域 == a[1], "行政區域"] <- "麻豆區晉江里"
+tn_edu[tn_edu$行政區域 == a[2], "行政區域"] <- "西港區檨林里"
+tn_edu[tn_edu$行政區域 == a[3], "行政區域"] <- "安南區塭南里"
+tn_edu[tn_edu$行政區域 == a[4], "行政區域"] <- "安南區公塭里"
+
+```
+
+---------
+
+### 桃園市
+- 完全沒錯
+
+```{r}
+edu2016 %>% filter(縣市 == "桃園市") %>% 
+  mutate(行政區域 = paste0(鄉鎮市區, 村里名稱.)) %>% 
+  dplyr::select(1,2,29,5:28)-> ty_edu
+ty_village <- six %>% filter(縣市名稱 == "桃園市")
+### 教育程度資料有，村里清單沒有：
+a <- dplyr::setdiff(ty_edu$行政區域, ty_village$行政區域) ; a
+### 村里清單有，教育程度資料沒有：
+dplyr::setdiff(ty_village$行政區域, ty_edu$行政區域)
+
+```
+
+---------
+
+### 台北市
+- 完全沒錯
+
+```{r}
+edu2016 %>% filter(縣市 == "臺北市") %>% 
+  mutate(行政區域 = paste0(鄉鎮市區, 村里名稱.)) %>% 
+  dplyr::select(1,2,29,5:28)-> tp_edu
+tp_edu[tp_edu$縣市 == "臺北市", "縣市"] <- "台北市"
+### 匯入處理過後的新北市各村里清單
+tp_village <- six %>% filter(縣市名稱 == "台北市")
+### 教育程度資料有，村里清單沒有：
+a <- dplyr::setdiff(tp_edu$行政區域, tp_village$行政區域) ; a
+### 村里清單有，教育程度資料沒有：
+dplyr::setdiff(tp_village$行政區域, tp_edu$行政區域)
+
+```
+
+### 合併六都
+
+```{r}
+six_edu <- rbind(ks_edu, tn_edu , tc_edu , ty_edu , np_edu , tp_edu)
+# mget(ls(pattern = "_edu")) %>% bind_rows()
+### 匯出存檔
+# six_edu %>% write.csv('2016六都教育程度.csv',row.names=F ,fileEncoding = "UTF8")
+```
+
+
+---------
+

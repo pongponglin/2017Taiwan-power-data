@@ -1,0 +1,456 @@
+---
+title: "台電電力資料"
+author: "ponponlin"
+date: "2017年7月8日"
+output: 
+  html_document: 
+    highlight: haddock
+    theme: spacelab
+    toc: yes
+    toc_depth: 3
+    toc_float: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  message = FALSE,
+  warning = FALSE )
+library(dplyr)
+library(tidyr)
+library(stringr)
+library(data.table)
+library(magrittr)
+library(highcharter)
+```
+
+<br/>
+
+## 1. 資料來源
+- [台電官方開放資料](http://www.taipower.com.tw/content/announcement/ann01.aspx?BType=37) : 各縣市村里售電資料-全部下載
+- 時間：201501 ~ 201705
+- 
+
+<br/>
+
+--------
+
+## 2. 資料處理
+- Excel 前處理：先選出2015, 2016年資料做處理，欄位裡會有很多空白格，像是 `"新北市   "`，所以先取代為無
+- 將村里為`無法分類`者全部去除
+- 將資料調整成雙月形式，2015年六個雙月都是7840筆，但在2016年5月是7837筆，其也是7840筆
+
+```{r}
+### 讀入2015 2016年全台灣售電量資料
+power2015  <- fread("iconv -f big5 -t utf8 original_data/2015全台各村里用電量.csv")
+power2016  <- fread("iconv -f big5 -t utf8 original_data/2016全台各村里用電量.csv")
+power_orgin <- rbind(power2015, power2016)
+head(power_orgin)
+#power %>%  filter(鄉鎮市區 == "無法分類", 村里 == '無法分類') %>% View
+
+### 鄉鎮市區與村里皆為無法分類 -> 去除
+power_orgin %>% filter(鄉鎮市區 == "無法分類", 村里 == '無法分類') %>% head()
+
+### 村里標示為無法分類
+power_orgin %>% filter(村里 == '無法分類') -> power_no
+  head(power_no)
+power2015 %>% filter(村里 == '無法分類') %>% 
+    group_by(縣市) %>% 
+    summarise(sum(售電量)/sum(as.numeric(power2015$售電量))) 
+#  a[1,1]/sum(as.numeric(power2015$售電量))
+### 無法分類者全部去除
+power_orgin %<>% filter(村里 != '無法分類')
+
+### 調整資料欄位格式
+power_orgin %>% 
+  mutate(行政區域 = paste(鄉鎮市區, 村里, sep = ''),
+         統計年月 = paste(substr(日期,1,4), substr(日期,6,7), sep = "")) %>% 
+  dplyr::select(統計年月, 縣市, 行政區域, 售電量, 抄表戶數) -> power
+power$縣市 <- as.character(power$縣市)
+
+### 發現有些村里在某些月份沒有資料
+power %>% 
+  group_by(統計年月, 縣市) %>% 
+  summarise(count = n())  
+### 將電力資料以雙月合併
+index <- which(as.numeric(power$統計年月)%%2 == 0) #找偶數月
+power[index,"統計年月"] <- as.numeric(power[index,"統計年月"])-1 # 將雙數月份-1
+power %>% 
+  group_by(統計年月,縣市,行政區域) %>% 
+  summarise(售電量度數 = sum(售電量)) -> power2
+# 檢查並成雙月之後，還有沒有售電量度數為0
+power2 %>% filter(售電量度數==0) 
+
+# 檢查每月筆數
+power2 %>% group_by(統計年月) %>% 
+  summarise(月份筆數 = n())
+power2 %>% group_by(縣市) %>% 
+  summarise(筆數 = n())
+
+```
+
+--------
+
+### 高雄市
+- 電力資料有，村里清單沒有：`"鳳山區誠正里"` `"鳳山區海風里"` `"湖內區公館里"` `"左營區復興里"`
+- 村里清單有，電力資料沒有：`"湖內區公舘里"` `"杉林區大愛里"`
+- `"杉林區大愛里"`是2014年7月才出現的里，
+- 大愛里的位置在月眉里與上平里中間，月眉里的電量 863769，上平里的電量 269249
+
+```{r}
+power2 %>% 
+  filter(縣市 == "高雄市") -> ks_power
+### 匯入處理過後的高雄市各村里清單
+ks_village <- read.csv('高雄市村里清單.csv', fileEncoding = 'utf8', header = T, stringsAsFactors = F)
+### 電力資料有，村里清單沒有：
+dplyr::setdiff(ks_power$行政區域, ks_village$行政區域)
+### 村里清單有，電力資料沒有：
+dplyr::setdiff(ks_village$行政區域, ks_power$行政區域)
+### 電力資料裡：將湖內區公館里更改為湖內區公舘里
+ks_power[ks_power$行政區域 == "湖內區公館里","行政區域"] <- '湖內區公舘里'
+ks_power[ks_power$行政區域 == "左營區_北里","行政區域"] <- "左營區廍北里"
+ks_power[ks_power$行政區域 == "左營區_南里","行政區域"] <- "左營區廍南里"
+ks_power[ks_power$行政區域 == "鳥松區_埔里","行政區域"] <- "鳥松區坔埔里"
+ks_power[ks_power$行政區域 == "阿蓮區_山里","行政區域"] <- "阿蓮區峯山里"
+
+ks_power %>% 
+  group_by(統計年月, 縣市) %>% 
+  summarise(count = n())  
+```
+
+#### 處理村里清單裡沒有的`"鳳山區誠正里"`, `"鳳山區海風里"`, `"左營區復興里"`
+- 由[鳳山區維基百科](https://zh.wikipedia.org/wiki/%E9%B3%B3%E5%B1%B1%E5%8D%80)，海風里併入海光里，誠正里併入生明里
+-`"左營區復興里"` 併入 `左營區永清里`
+
+```{r}
+ks_power[ks_power$行政區域 == "鳳山區誠正里",3] <- "鳳山區生明里"
+ks_power[ks_power$行政區域 == "鳳山區海風里",3] <- "鳳山區海光里"
+ks_power[ks_power$行政區域 == "左營區復興里",3] <- "左營區永清里"
+ks_power %>% 
+  group_by(統計年月,縣市,行政區域) %>% 
+  summarise(售電量度數 = sum(售電量度數)) -> ks_power2
+
+### 匯出高雄市雙月電量
+ks_power2015 <- ks_power2[grepl("^2015",ks_power2$統計年月),]
+ks_power2016 <- ks_power2[grepl("^2016",ks_power2$統計年月),]
+# write.csv(ks_power2015 ,"2015高雄市雙月電量.csv", fileEncoding = "utf8", row.names = F)
+# write.csv(ks_power2016  ,"2016高雄市雙月電量.csv", fileEncoding = "utf8", row.names = F)
+
+```
+
+------------
+
+### 台中市
+```{r}
+power2 %>% 
+  filter(縣市 == "臺中市") -> tc_power
+tc_power[tc_power$縣市 == "臺中市", "縣市"] <- "台中市"
+### 匯入處理過後的台中市各村里清單
+tc_village <- read.csv('台中市村里清單.csv', fileEncoding = 'utf8', header = T, stringsAsFactors = F)
+### 電力資料有，村里清單沒有：
+dplyr::setdiff(tc_power$行政區域, tc_village$行政區域)
+### 村里清單有，電力資料沒有：
+dplyr::setdiff(tc_village$行政區域, tc_power$行政區域)
+tc_power[tc_power$行政區域 == "西區公館里", "行政區域"] <- "西區公舘里"
+
+tc_power[tc_power$行政區域 == "西區_龍里", "行政區域"] <- "西區双龍里"
+tc_power[tc_power$行政區域 == "北屯區_子里", "行政區域"] <- "北屯區廍子里"
+tc_power[tc_power$行政區域 == "外埔區_子里", "行政區域"] <- "外埔區廍子里"
+tc_power[tc_power$行政區域 == "清水區_榔里", "行政區域"] <- "清水區槺榔里"
+tc_power[tc_power$行政區域 == "大安區龜_里", "行政區域"] <- "大安區龜壳里"
+tc_power[tc_power$行政區域 == "大肚區蔗_里", "行政區域"] <- "大肚區蔗廍里"
+### 匯出台中市雙月電量
+tc_power2015 <- tc_power[grepl("^2015",tc_power$統計年月),]
+tc_power2016 <- tc_power[grepl("^2016",tc_power$統計年月),]
+# write.csv(tc_power2015 ,"2015台中市雙月電量.csv", fileEncoding = "utf8", row.names = F)
+# write.csv(tc_power2016  ,"2016台中市雙月電量.csv", fileEncoding = "utf8", row.names = F)
+
+```
+
+------------
+
+### 新北市
+
+```{r}
+power2 %>% 
+  filter(縣市 == "新北市") -> np_power
+### 匯入處理過後的新北市各村里清單
+six <- read.csv("六都村里清單.csv", fileEncoding = "utf8", stringsAsFactors = F)
+np_village <- six %>% filter(縣市名稱 == "新北市")
+### 電力資料有，村里清單沒有：
+dplyr::setdiff(np_power$行政區域, np_village$行政區域)
+### 村里清單有，電力資料沒有：
+dplyr::setdiff(np_village$行政區域, np_power$行政區域)
+np_power[np_power$行政區域 == "板橋區公館里", "行政區域"] <- "板橋區公舘里"
+np_power[np_power$行政區域 == "坪林區石曹里", "行政區域"] <- "坪林區石𥕢里"
+ np_power[np_power$行政區域 == "瑞芳區濂洞里", "行政區域"] <- "瑞芳區濓洞里"
+ np_power[np_power$行政區域 == "瑞芳區濂新里", "行政區域"] <- "瑞芳區濓新里"
+ np_power[np_power$行政區域 == "三峽區永館里", "行政區域"] <- "三峽區永舘里"
+ np_power[np_power$行政區域 == "萬里區崁腳里", "行政區域"] <- "萬里區崁脚里"
+ np_power[np_power$行政區域 == "新店區五峰里", "行政區域"] <- "新店區五峯里"
+ np_power[np_power$行政區域 == "瑞芳區爪_里", "行政區域"] <- "瑞芳區爪峯里"
+ np_power[np_power$行政區域 == "中和區灰_里", "行政區域"] <- "中和區灰磘里"
+ np_power[np_power$行政區域 == "中和區瓦_里", "行政區域"] <- "中和區瓦磘里"
+ np_power[np_power$行政區域 == "土城區_廷里", "行政區域"] <- "土城區峯廷里"
+  np_power[np_power$行政區域 == "永和區新_里", "行政區域"] <- "永和區新廍里"
+  np_power[np_power$行政區域 == "樹林區_寮里", "行政區域"] <- "樹林區獇寮里"
+### 匯出新北市雙月電量
+ np_power2015 <- np_power[grepl("^2015",np_power$統計年月),]
+ np_power2016 <- np_power[grepl("^2016",np_power$統計年月),]
+# write.csv(np_power2015 ,"2015新北市雙月電量.csv", fileEncoding = "utf8", row.names = F)
+# write.csv(np_power2016  ,"2016新北市雙月電量.csv", fileEncoding = "utf8", row.names = F)
+```
+
+-----------
+
+### 桃園市 問題一堆
+- [五都改制對照表](https://raw.githubusercontent.com/g0v/twhgis/master/raw/g0v-admin-changes.csv)
+
+```{r}
+power2 %>% filter(縣市 == "桃園市") -> ty_power
+filter(six, 縣市名稱 == "桃園市") -> ty_village
+### 電力資料有，村里清單沒有：
+dplyr::setdiff(ty_power$行政區域, ty_village$行政區域)
+### 村里清單有，電力資料沒有：
+dplyr::setdiff(ty_village$行政區域, ty_power$行政區域)
+ty_power[ty_power$行政區域 == "新屋區_榔里", "行政區域"] <- "新屋區槺榔里"
+ty_power[ty_power$行政區域 == "大園區_林里", "行政區域"] <- "大園區菓林里"
+ty_power[ty_power$行政區域 == "八德區竹圍里", "行政區域"] <- "八德區竹園里"
+ty_power[ty_power$行政區域 == "大溪區人文里", "行政區域"] <- "大溪區仁文里"
+ty_power[ty_power$行政區域 == "龜山區坑口里", "行政區域"] <- "蘆竹區坑口里"
+ty_power[ty_power$行政區域 == "龍潭區大坪里", "行政區域"] <- "龍潭區大平里"
+ty_power[ty_power$行政區域 == "龍潭區東安里", "行政區域"] <- "平鎮區東安里"
+ty_power[ty_power$行政區域 == "龍潭區東勢里", "行政區域"] <- "平鎮區東勢里"
+ty_power[ty_power$行政區域 == "中壢區興合里", "行政區域"] <- "中壢區興和里"
+ty_power[ty_power$行政區域 == "中壢區中福里", "行政區域"] <- "中壢區忠福里"
+ty_power[ty_power$行政區域 == "中壢區南興里", "行政區域"] <- "大溪區南興里"
+ty_power[ty_power$行政區域 == "桃園區汴州里", "行政區域"] <- "桃園區汴洲里"
+ty_power[ty_power$行政區域 == "桃園區楓樹里", "行政區域"] <- "龜山區楓樹里"
+
+ty_power[ty_power$行政區域 == "桃園區中杉里", "行政區域"] <- "桃園區中山里"
+# 蘆竹區跟八德區都有大竹里
+#ty_power[ty_power$行政區域 == "桃園區大竹里", "行政區域"] <-  ""
+# ty_power[ty_power$行政區域 == "桃園區廣龍里", "行政區域"] <-  ""
+# 有後興路沒有後興里
+#ty_power[ty_power$行政區域 == "中壢區後興里", "行政區域"] <- 
+## 新竹縣關西鎮仁安里
+#ty_power[ty_power$行政區域 == "桃園區清溪里", "行政區域"] <- 
+#ty_power[ty_power$行政區域 == "蘆竹區大華里", "行政區域"] <- 
+#ty_power[ty_power$行政區域 == "龍潭區太平里", "行政區域"] <- 
+#ty_power[ty_power$行政區域 == "平鎮區振興里", "行政區域"] <- 
+
+```
+
+--------------
+
+### 台北市
+
+```{r}
+power2 %>% filter(縣市 == "臺北市") -> tp_power
+tp_power[tp_power$縣市 == "臺北市", "縣市"] <- "台北市"
+filter(six, 縣市名稱 == "台北市") -> tp_village
+### 電力資料有，村里清單沒有：
+dplyr::setdiff(tp_power$行政區域, tp_village$行政區域)
+### 村里清單有，電力資料沒有：
+dplyr::setdiff(tp_village$行政區域, tp_power$行政區域)
+tp_power[tp_power$行政區域 == "萬華區糖_里", "行政區域"] <- "萬華區糖廍里"
+
+### 匯出台北市雙月電量
+ tp_power2015 <- tp_power[grepl("^2015",tp_power$統計年月),]
+ tp_power2016 <- tp_power[grepl("^2016",tp_power$統計年月),]
+# write.csv(tp_power2015 ,"2015台北市雙月電量.csv", fileEncoding = "utf8", row.names = F)
+# write.csv(tp_power2016  ,"2016台北市雙月電量.csv", fileEncoding = "utf8", row.names = F)
+
+```
+ 
+-----
+
+### 台南市
+- 村里清單多了這些里："新營區舊廍里" "後壁區後廍里" "七股區塩埕里" "七股區槺榔里" "龍崎區石𥕢里"
+
+```{r}
+power2 %>% 
+  filter(縣市 == "臺南市") -> tn_power
+tn_power[tn_power$縣市 == "臺南市", "縣市"] <- "台南市"
+tn_village <- six %>% filter(縣市名稱 == "台南市")
+### 電力資料有，村里清單沒有：
+dplyr::setdiff(tn_power$行政區域, tn_village$行政區域)
+### 村里清單有，電力資料沒有：
+dplyr::setdiff(tn_village$行政區域, tn_power$行政區域)
+
+tn_power[tn_power$行政區域 == "安南區_田里", "行政區域"] <- "安南區塩田里"
+tn_power[tn_power$行政區域 == "官田區南_里", "行政區域"] <- "官田區南廍里"
+tn_power[tn_power$行政區域 == "佳里區頂_里", "行政區域"] <- "佳里區頂廍里"
+tn_power[tn_power$行政區域 == "麻豆區_江里", "行政區域"] <- "麻豆區晉江里"
+tn_power[tn_power$行政區域 == "麻豆區寮_里", "行政區域"] <- "麻豆區寮廍里"
+tn_power[tn_power$行政區域 == "山上區玉_里", "行政區域"] <- "山上區玉峯里"
+tn_power[tn_power$行政區域 == "新化區那拔里", "行政區域"] <- "新化區𦰡拔里"
+ tn_power[tn_power$行政區域 == "新化區山腳里", "行政區域"] <- "新化區山脚里"
+ tn_power[tn_power$行政區域 == "永康區_行里", "行政區域"] <- "永康區塩行里"
+ tn_power[tn_power$行政區域 == "永康區鹽洲里", "行政區域"] <- "永康區塩洲里"
+```
+
+<br/>
+
+--------
+
+## 3. 非營業用電量
+- 資料來源：[台電-各縣市非營業用戶售電量](http://www.taipower.com.tw/content/announcement/ann01.aspx?BType=31)
+- 2015上半年、2015下半年、2016上半年
+- 不像住商混合資料有無法分類的村里
+- 一集統計區對照村里有誤，用立哲整理的一級統計區與村里對照表更新
+```{r}
+a <- readLines("original_data/雙北一級統計區_村里對照.csv", n=21164, encoding = "utf8")
+a <- readLines("original_data/全國_一級統計區_村里對照0811V2.csv", n=77774, encoding = "utf8")
+b <- as.data.frame(a, sep=",")
+village_r  <- str_split_fixed(b$a, ",",8)
+colnames(village_r ) = village_r [1,]
+village_r <- village_r [2:length(a), ] %>% as.data.frame()
+#village_r <-fread("original_data/全國_一級統計區_村里對照0811V2.csv")
+#iconv -f big5 -t utf8
+#village_r <- read.csv("original_data/全國_一級統計區_村里對照0811V2.csv", fileEncoding = "big5") 
+
+```
+
+
+### 高雄市
+```{r}
+ks_nopower <- read.csv("original_data/105上半年高雄市各地非營業用戶售電量.csv", fileEncoding = "utf8") %>% 
+  mutate(area = paste0(area, cunli)) %>%
+  dplyr::select(1,9,7,3)
+ks_nopower$area <-  gsub("村","里",ks_nopower$area)
+### 將電力資料以雙月合併
+index <- which(as.numeric(ks_nopower$Ym)%%2 == 0) #找偶數月
+ks_nopower[index,"Ym"] <- as.numeric(ks_nopower[index,"Ym"])-1 # 將雙數月份-1
+ks_nopower %>% 
+  group_by(Ym,city,area) %>% 
+  summarise(售電量度數 = sum(gen)) -> ks_nopower
+ks_nopower$city <- as.character(ks_nopower$city)
+
+# 檢查並成雙月之後，還有沒有售電量度數為0
+ks_nopower %>% filter(售電量度數==0) 
+### 電力資料有，村里清單沒有：
+dplyr::setdiff(ks_nopower$area, ks_village$行政區域)
+### 村里清單有，電力資料沒有：
+dplyr::setdiff(ks_village$行政區域, ks_nopower$area)
+ks_nopower[ks_nopower$area == "湖內區公館里",3] <- '湖內區公舘里'
+ks_nopower[ks_nopower$area == "左營區部北里",3] <- "左營區廍北里"
+ks_nopower[ks_nopower$area == "左營區部南里",3] <- "左營區廍南里"
+ks_nopower[ks_nopower$area == "鳥松區圣埔里",3] <- "鳥松區坔埔里"
+ks_nopower[ks_nopower$area == "阿蓮區峰山里",3] <- "阿蓮區峯山里"
+ks_nopower[ks_nopower$area == "鳳山區誠正里",3] <- "鳳山區生明里"
+ks_nopower[ks_nopower$area == "鳳山區海風里",3] <- "鳳山區海光里"
+ks_nopower[ks_nopower$area == "左營區復興里",3] <- "左營區永清里"
+ks_nopower[ks_nopower$area == "桃源區梅蘭里",3] <- "桃源區拉芙蘭里"
+
+
+```
+
+--------
+
+### 台北市
+
+```{r}
+tp_nwev <- village_r %>% filter(COUNTY == "臺北市") %>% 
+  mutate(region = paste0(TOWN, VILLAGE)) %>% 
+  dplyr::select(CODE1,COUNTY, region) 
+tp_nwev$VILLAGE <- as.character(tp_nwev$VILLAGE)
+
+### 讀入電力資料
+a1 <- read.csv("original_data/105上半年台北市各地非營業用戶售電量.csv", fileEncoding = "utf8", stringsAsFactors = F) 
+a2 <- read.csv("original_data/105下半年台北市各地非營業用戶售電量.csv", fileEncoding = "utf8", stringsAsFactors = F) 
+tp_nopower <- bind_rows(a1,a2)
+
+merge(tp_nopower, tp_nwev, by.x="code1", by.y = "CODE1" ) %>%
+  dplyr::select(2,3,9,11) -> tp_nopower
+dplyr::setdiff(tp_nopower$region, tp_village$行政區域)
+dplyr::setdiff(tp_village$行政區域, tp_nopower$region)
+tp_nopower[tp_nopower$region == "萬華區糖[部]里","region"] <- "萬華區糖廍里"
+
+### 將電力資料以雙月合併
+index <- which(as.numeric(tp_nopower$Ym)%%2 == 0) #找偶數月
+tp_nopower[index,"Ym"] <- as.numeric(tp_nopower[index,"Ym"])-1  
+
+tp_nopower %>% 
+  group_by(Ym, city, region) %>% 
+  summarise(gen_sum = sum(gen)) -> tp_nopower
+tp_nopower[tp_nopower$city == "臺北市", "city"] <- "台北市"
+
+# 檢查並成雙月之後，還有沒有售電量度數為0
+tp_nopower %>% filter(gen_sum ==0) 
+
+merge(tp_village, tp_nopower, by.x= "行政區域", by.y="region") -> tp_nopower2016
+tp_nopower2016 %>%   group_by(Ym) %>% summarise(n()) 
+
+### 匯出檔案
+# write.csv(tp_nopower2016, "2016台北市非營業用電.csv", fileEncoding = "utf8", row.names = F)
+```
+
+
+
+--------
+
+### 比較營業與非營業
+- 台北市 ,201601,201603,201605
+- 住商混合減非營業用電有負的
+
+```{r}
+tp_power2016 <- read.csv("2016台北市雙月電量.csv", fileEncoding = "utf8", stringsAsFactors = F)
+### 合併非營業與住商
+merge(tp_power2016, tp_nopower, by.x = c("統計年月","行政區域"), by.y = c("date","area_c")) %>% 
+  mutate(商用=售電量度數-gen_sum) -> tp_mix
+
+par(family="STXihei")
+hist(tp_mix$商用, main = "住商混合減非營業用電")
+plot(x= tp_mix$gen_sum, y=tp_mix$商用)
+
+```
+
+
+--------
+
+## 4. 全台行政區電量
+- 要做全台行政區隨時間變化的地圖
+- 年份：2015,2016 住商混合用電量
+- 2015,2016 上半年非營業用電量（要一個縣市一個縣市下載）
+
+```{r}
+power_orgin %>% 
+  mutate(統計年月 = paste(substr(日期,1,4), substr(日期,6,7), sep = "")) %>% 
+  dplyr::select(統計年月, 縣市, 鄉鎮市區,村里,售電量, 抄表戶數) -> power_region
+
+index <- which(as.numeric(power_region$統計年月)%%2 == 0) #找偶數月
+power_region[index,"統計年月"] <- as.numeric(power_region[index,"統計年月"])-1 # 將雙數月份-1
+power_region %<>% 
+  group_by(統計年月,縣市,鄉鎮市區) %>% 
+  summarise(售電量度數 = sum(售電量), 抄表戶數 = sum(抄表戶數))
+
+power_region %>%   filter(substr(鄉鎮市區, 1, 1) == '_')
+power_region %>%   filter(substr(鄉鎮市區, 2, 2) == '_')
+
+### 匯出檔案
+# write.csv(power_region, "20152016全台分區售電量.csv", fileEncoding = "utf8", row.names = F)
+
+```
+
+### 台北市
+```{r}
+tp_region <-power_region %>% filter(縣市 == "臺北市") 
+hchart(tp_region, "line", hcaes(x = 統計年月, y = 售電量度數, group = 鄉鎮市區))
+
+```
+
+5. 歷年用電量
+
+ 
+```{r}
+power_year <- read.csv("year_poweruse.csv", fileEncoding = "big5")
+power_year[c(53:72),] %>%  
+  mutate(year = 民國年+1911) %>% 
+  arrange(year) -> year_p
+highchart() %>% 
+  hc_chart(type = "line") %>% 
+  hc_xAxis(categories = year_p$year) %>% 
+  hc_add_series(data= year_p$電燈.非營業用., name = "非營業") %>% 
+  hc_add_series(data= year_p$電燈.營業用., name = "營業")  
+```
+
