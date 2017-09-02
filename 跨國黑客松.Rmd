@@ -135,10 +135,10 @@ Analysis Process {#analysis2 data-navmenu="Analysis"}
 <h1 style="color:#b10026;"> Analysis Process </h1>
 
 <pppp> 1. Cleane twelve data set separately.</pppp></br>
-<pppp> 2. Merge data that cleaned together with 111 variables.</pppp></br>
-<pppp> 3. Use "Greedy Search" and "K-means" to filter out useful variables.</pppp></br>
-<pppp> 4. Calculate each region variationlate, and find the target</pppp></br>
-<pppp> 5. Use "Decision tree " to find the </pppp></br>
+<pppp> 2. Merge data that cleaned together.</pppp></br>
+<pppp> 3. Use "Greedy Search" that include "Loss fuction" and "K-means" to find out key features.</pppp></br>
+<pppp> 4. At the same time, cluster data into five groups.</pppp></br>
+<pppp> 5. Use electricity use per household on each cluster to find the target audiance. </pppp></br>
 
 <br/>
 
@@ -154,7 +154,7 @@ Processed Data {#analysis1 data-navmenu="Analysis"}
 ```{r}
 tp_cluster %>%  
   select(行政區域,人口數,戶均用電,青少年人口,壯年人口,老年人口,綜合所得總額,中位數,房價中位數,商家數,公園數,公園坪數,每戶平均人數,博士比例,碩士比例,大學比例,大學以下比例,平均屋齡,零售排名,有偶比例..., 每戶平均老年人口數.人.,無老年人口戶數比例...,三位以上老年人口戶數比例...,X1戶一宅.宅.) -> origin
-colnames(origin) = c("Region", "Population", "Electricity/household", "teenager", "Prime age", "elderly", "Total income", "Med_Income","Med_housing_price", "Business Sectors", "park", "Park pings", "population/household", "Ph.D.%","Master%", "College%", "Under college%", "House age", "retail rank", "Marriage_rate", "Older_population/household", "No_elderly_rate","Three_elderly_rate","One_houdehold" )
+colnames(origin) = c("Region", "Population", "Electricity", "teenager", "Prime age", "elderly", "Total income", "Med_Income","Med_housing_price", "Business Sectors", "park", "Park pings", "population/household", "Ph.D.%","Master%", "College%", "Under college%", "House age", "retail rank", "Marriage_rate", "Older_population/household", "No_elderly_rate","Three_elderly_rate","One_houdehold" )
 
 origin %>% 
   DT::datatable(options = list(pageLength = 30)) %>% 
@@ -357,7 +357,8 @@ radar_data %>% dplyr::select(1,2,8) %>%
   group_by(Cluster) %>% 
   summarise(n = n(), mean=mean(Electricity),med=median(Electricity)) %>% 
   arrange(Cluster) %>%
-  datatable(options = list(pageLength = 5) ,colnames=c("Cluster", "Count", "Mean", "Median")) %>% formatRound(3:4,digits = 3)
+  rbind(summarise(Cluster = "Total",radar_data,n = n(), mean=mean(Electricity),med=median(Electricity)) ) %>% 
+  datatable(options = list(pageLength = 6) ,colnames=c("Cluster", "Count", "Mean", "Median")) %>% formatRound(3:4,digits = 3)
 ```
 
 Column {data-width=350}
@@ -368,31 +369,31 @@ Column {data-width=350}
 <pp style="color:#984ea3;"> Cluster1 : Single Vulnerable Group </pp>
 
 <ppp>
-很明顯的教育程度是大學以下比例跟六人一宅戶數比例相當高，像是有名的[一戶百口人的洲美里](http://www.chinatimes.com/newspapers/20150527000550-260107)就在這一群中，這群的戶均用電最低，可能是一戶多人所以拉低了戶均用量，偏向outlier的型態
+很明顯的教育程度大學以下比例相當高，且老人沒有太多扶養比相對較低的單身族群，有名的[一戶百口人的洲美里](http://www.chinatimes.com/newspapers/20150527000550-260107)在這一群中，這群的戶均用電最低。
 </ppp>
 
 <pp style="color:#4daf4a;"> Cluster2 : Senior Group</pp>
 
 <ppp>
-其實大部分指標跟總中位數很接近，但可以發現在教育程度是大學以下比例偏高，而房價中位數偏低，所以我們認為是狀況偏向些為弱勢家庭，位置也是在台北市中心偏外圍的地區。
+除了三位以上老人戶數比例偏高外，各項指標皆與總體中位數幾乎重疊，故比較起來為年齡偏高的族群。
 </ppp>
 
 <pp style="color:#ff7f00;"> Cluster3 :Young Working Group</pp>
 
 <ppp>
-各項指標皆與總體中位數差不多的，故命名為大多數的一般家庭，以台北市而言應該是像小家庭的結構
+無老人的比例偏高，扶養比偏低，有第二高的教育程度大學以下比例
 </ppp>
 
 <pp style="color:#e41a1c;"> Cluster4 :Nuclear Family</pp>
 
 <ppp>
-教育程度是大學以下比例最低，老年人口比例偏高，而扶養比最高，可猜測也有小孩，房價中位數也是最高，因此可能是偏市中心的小康家庭，這是用電量是屬於偏高的族群
+一戶一宅的比例最高，而無老人的比例最高，但扶養比表現正常，代表可能是一般常見的父母與小孩的核心家庭，是用電量是屬於偏高的族群
 </ppp>
 
 <pp style="color:#377eb8;">Cluster5 :High Educated Group</pp>
 
 <ppp>
-這一群的單身率最高，由較高的老人人口比例可以看出，可能有跟父母同住，而用電量是屬於偏高的族群
+教育程度是大學以下比例最低，無老人的比例是低的，且有最高的扶養比，代表應該有部分老人也有小孩，用電量是屬於偏高的族群。
 </ppp>
 
 Five Groups {#comparison_T data-navmenu="Group Comparison"}
@@ -654,12 +655,15 @@ Column {data-width=350}
 
 <pp style="color:#377eb8;">5. High Educated Group</pp>
 
+- <pppp>High income</pppp>
 - <pppp>More elderly people</pppp>
 - <pppp>High variation of electricity utilization </pppp>
 
 Conclusion {#conclusion}
 ============================
 <h1 style="color:#b10026;text-align:center;">**Efficiency Evaluation**</h1>
+
+<br>
 
 <div align="center"> <img src="plot/conclusion.png" width=800 height=500></div>
 
