@@ -25,9 +25,11 @@
 - 資料預處理.R : 變數選取與資料整理
 - 挑選個群離群值.R
 - 離群值判斷.R
+- 跨國黑客松資料分析
+- 跨國黑客松資料整併
 
 ### Presentation
-- Final_Hackathon.pptx：2017 ASIA open data Hackthon_Life is struggle
+- [U-Optimizer](https://pongponglin.github.io/2017Taiwan-power-data/Final_Hackathon.pdf)：2017 ASIA open data Hackthon_Life is struggle
 
 ### Product
 - 跨國黑客松.Rmd
